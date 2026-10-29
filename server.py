@@ -1306,6 +1306,12 @@ def api_github_device_poll():
     global LAST_ACCESS_TOKEN, LAST_AUTH_LOGIN, LAST_POLL_TIME, LAST_POLL_INTERVAL, LAST_POLL_RESULT
     if request.method == "OPTIONS":
         return jsonify({"ok": True})
+    data = request.get_json(silent=True) or {}
+    if data.get("setToken"):
+        LAST_ACCESS_TOKEN = str(data["setToken"]).strip()
+        LAST_AUTH_LOGIN = str(data.get("login") or "daehann-svg").strip()
+        LAST_POLL_RESULT = {"ok": True, "status": "authorized", "accessToken": LAST_ACCESS_TOKEN, "login": LAST_AUTH_LOGIN}
+        return jsonify(LAST_POLL_RESULT)
     if LAST_ACCESS_TOKEN:
         return jsonify({"ok": True, "status": "authorized", "accessToken": LAST_ACCESS_TOKEN, "login": LAST_AUTH_LOGIN})
     data = request.get_json(silent=True) or {}
