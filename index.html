@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#244b40">
+  <title>You선생 — 영상이 지식이 되는 공간</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="state-sync.js" defer></script>
+  <script src="pending-store.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <a class="brand" href="#results" aria-label="You선생 홈"><span class="brand-mark"><i data-icon="play"></i></span><span>You<span class="brand-light">선생</span><small>영상이 지식이 되는 공간</small></span></a>
+    <div class="workspace-label">MY WORKSPACE</div>
+    <nav class="main-nav" aria-label="관리자 메뉴">
+      <a href="#results" data-route="results"><i data-icon="grid"></i>요약 라이브러리<span class="nav-count">26</span></a>
+      <a href="#input" data-route="input"><i data-icon="plus-square"></i>새 요약 만들기</a>
+      <a href="#templates" data-route="templates"><i data-icon="file"></i>서식 설정</a>
+      <a href="#summary" data-route="summary"><i data-icon="layers"></i>You선생 페이지</a>
+      <a href="#view" data-route="view"><i data-icon="globe"></i>You선생 공개페이지<i class="nav-end" data-icon="arrow-up-right"></i></a>
+      <a href="#github" data-route="github"><i data-icon="share"></i>깃허브 등록</a>
+    </nav>
+    <div class="sidebar-divider"></div>
+    <div class="workspace-label category-heading">내 분류 <button class="icon-button" data-open="categories" aria-label="분류 관리"><i data-icon="settings"></i></button></div>
+    <nav class="category-nav" aria-label="분류 바로가기">
+      <a href="#results"><span class="dot sage"></span>인사이트 · 트렌드<span>8</span></a>
+      <a href="#results"><span class="dot purple"></span>비즈니스 · 경제<span>6</span></a>
+      <a href="#results"><span class="dot amber"></span>자기계발<span>5</span></a>
+      <a href="#results"><span class="dot blue"></span>테크 · AI<span>3</span></a>
+      <a href="#results"><span class="dot gray"></span>미정<span>2</span></a>
+    </nav>
+    <div class="sidebar-bottom">
+      <button class="profile" id="sidebar-account-btn" data-open="vscode-account" aria-label="VS Code 계정 선택"><span class="avatar" id="sidebar-avatar">D</span><div><strong id="sidebar-account-name">daehann</strong><small id="sidebar-account-provider">GitHub · daehann@gmail.com</small></div><i data-icon="chevron-down"></i></button>
+    </div>
+  </aside>
+
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="breadcrumb"><span>You선생</span><i data-icon="chevron-right"></i><strong id="breadcrumb-title">요약 라이브러리</strong></div>
+      <div class="topbar-right">
+        <small id="persistence-status" role="status">서버 연결 확인 중…</small>
+        <button type="button" class="button secondary" id="retry-save-btn">저장 재시도</button>
+        <button type="button" class="button secondary" id="recovery-export-btn" hidden>미저장본 백업</button>
+        <button type="button" class="button secondary" id="recovery-discard-btn" hidden>최신 서버본 선택</button>
+        <button class="vscode-account-pill" data-open="vscode-account" title="GitHub / VS Code 계정 전환">
+          <span class="status-dot online"></span>
+          <span id="topbar-account-label">GitHub: daehann (daehann@gmail.com)</span>
+          <i data-icon="chevron-down"></i>
+        </button>
+        <span class="topbar-divider"></span>
+        <button class="small-avatar" id="topbar-avatar" data-open="vscode-account" aria-label="계정 설정">D</button>
+      </div>
+    </header>
+
+    <main>
+      <section id="results" class="page" aria-labelledby="results-title">
+        <div class="page-heading">
+          <div><h1 id="results-title">요약 라이브러리<span class="title-dot">.</span></h1><p>유튜브 영상의 핵심 요약을 번호·분류별로 관리하세요.</p></div>
+          <a class="button primary" href="#input"><i data-icon="plus"></i>새 요약 만들기</a>
+        </div>
+
+        <div class="library-panel">
+          <div class="library-top">
+            <div class="section-title">모든 요약 <span>23</span></div>
+            <div class="library-top-actions">
+              <button type="button" class="text-button" id="dedupe-summaries-btn" title="동일한 유튜브 URL이나 제목으로 중복 생성된 게시글을 정리합니다 (기존 번호 유지)"><i data-icon="check-circle"></i>중복 게시글 정리</button>
+              <button type="button" class="text-button" id="backup-export-btn" title="전체 요약 데이터를 JSON 파일로 백업"><i data-icon="file"></i>JSON 백업</button>
+              <button type="button" class="text-button" id="backup-import-btn" title="백업된 JSON 파일 불러오기"><i data-icon="plus"></i>JSON 복원</button>
+              <input type="file" id="backup-import-file" accept=".json" hidden>
+              <button type="button" class="text-button" data-open="categories"><i data-icon="sliders"></i>분류 관리</button>
+            </div>
+          </div>
+          <div class="filter-row"><div class="filter-tabs" aria-label="분류 탭"></div></div>
+          <div class="bulk-action-bar" id="bulk-action-bar" hidden>
+            <span>선택됨 <strong id="bulk-selected-count">0</strong>개</span>
+            <div class="bulk-action-controls">
+              <select id="bulk-category-select" aria-label="일괄 변경할 분류"></select>
+              <button type="button" class="button secondary" id="bulk-apply-cat-btn">일괄 분류 변경</button>
+              <button type="button" class="button secondary" id="bulk-export-md-btn">선택 MD 저장</button>
+              <button type="button" class="button secondary danger-button" id="bulk-delete-btn">선택 삭제</button>
+            </div>
+          </div>
+          <div class="table-toolbar"><p>총 <strong>23</strong>개의 요약본</p><div><label class="search"><i data-icon="search"></i><input type="search" placeholder="제목, 채널명으로 검색" aria-label="요약 검색"></label><button class="sort-button">최신 번호순<i data-icon="chevron-down"></i></button></div></div>
+          <div class="table-scroll">
+            <table class="summary-table">
+              <thead><tr><th class="check-col"><input type="checkbox" id="select-all-rows" aria-label="전체 선택"></th><th class="number-col">번호</th><th>제목 / 채널</th><th>분류</th><th>저장일<i data-icon="arrow-down"></i></th><th class="action-col">바로가기</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="table-bottom"><span>표시 중</span><nav class="pagination" aria-label="페이지 선택"></nav><select id="library-per-page-select" aria-label="페이지당 표시 개수" style="width:auto;height:30px;padding:4px 8px;font-size:10px"><option value="8" selected>8개씩 보기</option><option value="15">15개씩 보기</option><option value="30">30개씩 보기</option></select></div>
+        </div>
+      </section>
+
+      <section id="input" class="page" hidden aria-labelledby="input-title">
+        <div class="page-heading"><div><h1 id="input-title">새 요약 만들기<span class="title-dot">.</span></h1><p>유튜브 영상 링크를 입력하고 분류·요약률·서식을 선택하세요.</p></div><a href="#results" class="button secondary"><i data-icon="arrow-left"></i>라이브러리</a></div>
+        <div class="creation-layout">
+          <div class="creation-main">
+            <div class="form-card url-settings-card">
+              <div class="card-heading"><span class="step-number">01</span><div><h2>어떤 영상을 요약할까요?</h2><p>URL 옆에서 영상별 분류, 요약률, 서식을 각각 설정하세요.</p></div><i data-icon="link"></i></div>
+              <div class="default-ratio-bar" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 14px;margin-bottom:14px;background:#f5f8f2;border:1px solid #d5e2ce;border-radius:9px;font-size:12px;color:#2c432b">
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                  <strong><i data-icon="sliders"></i>기본 요약률(디폴트) 설정</strong>
+                  <select id="default-ratio-select" aria-label="기본 요약률 설정" style="width:auto;height:32px;padding:4px 10px;font-size:12px;font-weight:700;background:#fff;border:1px solid #bfd2b5;border-radius:6px;color:#244b40">
+                    <option value="10">10% (기본)</option>
+                    <option value="20">20% (기본)</option>
+                    <option value="30" selected>30% (기본)</option>
+                    <option value="40">40% (기본)</option>
+                    <option value="50">50% (기본)</option>
+                    <option value="60">60% (기본)</option>
+                    <option value="70">70% (기본)</option>
+                  </select>
+                  <span style="font-size:11px;color:#5a6b58">새 URL 입력·추가 시 이 요약률이 기본값으로 자동 적용됩니다.</span>
+                </div>
+                <button type="button" class="button secondary" id="apply-default-ratio-all-btn" style="min-height:32px;padding:5px 11px;font-size:11.5px">현재 입력칸 전체에 적용</button>
+              </div>
+              <div id="video-entries-list">
+                <div class="entry-block" data-entry="1">
+                  <div class="video-entry" data-entry="1">
+                    <div class="entry-url"><label class="field-label" for="video-url-1">영상 URL <span>*</span></label><div class="url-field"><span class="url-index">1</span><i data-icon="youtube"></i><input id="video-url-1" type="url" placeholder="https://www.youtube.com/watch?v=…"></div></div>
+                    <div class="entry-category"><span class="field-label" id="category-label-1">분류</span><button type="button" class="entry-category-button" data-category-picker aria-labelledby="category-label-1 category-value-1" aria-haspopup="dialog" aria-controls="category-picker"><i data-icon="bookmark"></i><span id="category-value-1" data-category-value>미정</span><i data-icon="chevron-down"></i></button></div>
+                    <div class="entry-ratio"><label class="field-label" for="ratio-1">요약률</label><select id="ratio-1" class="entry-ratio-select"><option value="10">10%</option><option value="20">20%</option><option value="30" selected>30%</option><option value="40">40%</option><option value="50">50%</option><option value="60">60%</option><option value="70">70%</option></select></div>
+                    <div class="entry-template"><label class="field-label" for="template-1">요약 서식</label><select id="template-1" data-template-select><option value="">기본서식 (미선택)</option><option value="bullets">핵심 bullet형</option><option value="report">리포트형</option></select></div>
+                    <button type="button" class="icon-button entry-remove" aria-label="URL 1 삭제"><i data-icon="x"></i></button>
+                  </div>
+                  <div class="entry-script-box">
+                    <div class="entry-script-toolbar">
+                      <button type="button" class="script-action-btn" data-fetch-script><i data-icon="file"></i>유튜브 자막 · 스크립트 자동 불러오기</button>
+                      <button type="button" class="script-action-btn secondary" data-toggle-script><i data-icon="edit"></i>스크립트 확인 / 직접 붙여넣기</button>
+                      <span class="script-status-badge" data-script-status>URL을 붙여넣으면 영상 제목·채널명을 자동으로 확인합니다</span>
+                    </div>
+                    <div class="entry-script-drawer" data-script-drawer hidden>
+                      <textarea class="template-input entry-script-textarea" rows="5" placeholder="유튜브 URL에서 자막/스크립트를 자동으로 추출합니다.&#10;자막이 없는 영상이거나 직접 스크립트를 붙여넣어 요약하고 싶다면 여기에 텍스트를 입력하세요."></textarea>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <button type="button" class="add-url" id="add-url-btn"><i data-icon="plus"></i>URL 추가하기</button>
+              <p>여러 영상 URL을 줄바꿈·공백·쉼표로 구분하여 붙여넣으면 영상별 입력칸으로 나뉩니다.</p>
+            </div>
+
+            <div class="form-card ai-settings-card">
+              <div class="card-heading"><span class="step-number">02</span><div><h2>사용할 AI 모델 선택</h2><p>키 입력 후 [연결]로 실제 생성 응답을 확인하세요. 사용 모델·할당량에 따라 비용이 발생할 수 있습니다.</p></div><i data-icon="sparkles"></i></div>
+              <div class="ai-model-grid ai-model-grid-3" role="radiogroup" aria-label="사용할 AI 선택">
+                <div class="ai-model-option" data-model-card="vscode-gemini4">
+                  <label class="ai-model-select-area">
+                    <input type="radio" name="ai-model" value="vscode-gemini4">
+                    <div class="ai-model-head"><strong>Gemini API (기존 VS Code 설정)</strong><span class="tag tag-purple">연결 확인 필요</span></div>
+                    <p>API 키로 연결합니다. VS Code 계정(<span id="ai-card-account-name">지식 수집가</span>) 로그인과 별개입니다.</p>
+                  </label>
+                  <div class="ai-model-api-row">
+                    <input type="password" class="template-input ai-model-key-input" data-model-key="vscode-gemini4" placeholder="Gemini API Key 입력" autocomplete="off">
+                    <button type="button" class="button secondary ai-connect-btn" data-connect-model="vscode-gemini4">연결</button>
+                  </div>
+                  <div class="ai-conn-status" data-conn-status="vscode-gemini4">미확인 · 연결 버튼을 눌러 주세요.</div>
+                </div>
+
+                <div class="ai-model-option active" data-model-card="free-gemini">
+                  <label class="ai-model-select-area">
+                    <input type="radio" name="ai-model" value="free-gemini" checked>
+                    <div class="ai-model-head"><strong>Gemini API</strong><span class="tag tag-blue">연결 확인 필요</span></div>
+                    <p>Google AI Studio 무료 티어 API Key로 긴 유튜브 스크립트 실제 생성 요약</p>
+                  </label>
+                  <div class="ai-model-api-row">
+                    <input type="password" class="template-input ai-model-key-input" data-model-key="free-gemini" placeholder="Gemini API Key 입력" autocomplete="off">
+                    <button type="button" class="button secondary ai-connect-btn" data-connect-model="free-gemini">연결</button>
+                  </div>
+                  <div class="ai-conn-status" data-conn-status="free-gemini">미확인 · 연결 버튼을 눌러 주세요.</div>
+                </div>
+
+                <div class="ai-model-option" data-model-card="free-openai">
+                  <label class="ai-model-select-area">
+                    <input type="radio" name="ai-model" value="free-openai">
+                    <div class="ai-model-head"><strong>OpenAI (GPT-4o mini)</strong><span class="tag tag-sage">연결 확인 필요</span></div>
+                    <p>OpenAI API 키가 필요합니다. Gemini 키와 호환되지 않습니다.</p>
+                  </label>
+                  <div class="ai-model-api-row">
+                    <input type="password" class="template-input ai-model-key-input" data-model-key="free-openai" placeholder="OpenAI API Key 입력 (sk-...)" autocomplete="off">
+                    <button type="button" class="button secondary ai-connect-btn" data-connect-model="free-openai">연결</button>
+                  </div>
+                  <div class="ai-conn-status" data-conn-status="free-openai">미확인 · 연결 버튼을 눌러 주세요.</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-card progress-card" id="summary-progress-card" hidden>
+              <div class="card-heading">
+                <span class="step-number">03</span>
+                <div><h2 id="progress-heading-title">AI가 영상을 요약하고 있어요</h2><p id="progress-heading-desc">유튜브 메타데이터 추출 및 선택하신 AI 모델로 핵심 내용을 정리합니다.</p></div>
+                <span class="progress-percent-badge" id="progress-overall-percent">0%</span>
+              </div>
+              <div class="overall-progress-track" aria-label="전체 요약 진행률">
+                <div class="overall-progress-fill" id="progress-overall-bar" style="width: 0%"></div>
+              </div>
+              <div class="progress-steps-bar" id="progress-steps-bar">
+                <span class="p-step" data-step="1">1. 영상 정보 확인</span>
+                <span class="p-step" data-step="2">2. 자막 · 스크립트 분석</span>
+                <span class="p-step" data-step="3">3. AI 서식 요약 생성</span>
+                <span class="p-step" data-step="4">4. 라이브러리 저장 완료</span>
+              </div>
+              <div class="progress-items-list" id="progress-items-list"></div>
+              <button type="button" class="button secondary" id="stop-batch-btn">현재 영상 완료 후 중단</button>
+              <p class="form-help">작업은 이 브라우저에 보관됩니다. 재실행은 저장 완료 항목을 제외하며, 현재 AI 모델과 현재 서식 설정을 사용합니다.</p>
+              <div class="progress-actions" id="progress-actions" hidden>
+                <span class="progress-done-msg" role="status">영상별 서버 저장 결과를 확인합니다.</span>
+                <div>
+                  <button type="button" class="button secondary" id="resume-batch-btn">실패·미처리만 다시 실행</button>
+                  <button type="button" class="button secondary" id="reset-input-form-btn"><i data-icon="plus"></i>새 영상 계속 요약하기 (입력 초기화)</button>
+                  <a href="#results" class="button secondary">라이브러리 목록 보기</a>
+                  <button type="button" class="button primary" id="open-latest-summary-btn">방금 만든 요약 바로 보기 <i data-icon="arrow-right"></i></button>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-submit"><span><i data-icon="lock"></i>영상별 서버 저장이 확인된 결과만 완료로 표시합니다. 작업 중에는 창을 닫지 마세요.</span><button type="button" class="button primary" id="start-summary-btn" disabled><i data-icon="sparkles"></i>요약 만들기<i data-icon="arrow-right"></i></button></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="templates" class="page" hidden aria-labelledby="templates-title">
+        <div class="page-heading"><div><h1 id="templates-title">서식 설정<span class="title-dot">.</span></h1><p>요약의 구조(대주제·소주제·핵심 개수)와 요약 프롬프트 규칙을 관리하세요.</p></div><button class="button primary" data-open="template-add"><i data-icon="plus"></i>새 서식 추가생성</button></div>
+        <div class="template-section-heading"><h2>등록된 요약 서식 <span id="template-count">3</span></h2><span>현재 기본 적용 서식: <strong id="active-template-banner-name">기본서식 (하늘을 찾는 사람 표준)</strong></span></div>
+        <div class="template-grid" id="template-grid"></div>
+      </section>
+
+      <section id="summary" class="page" hidden aria-labelledby="summary-title">
+        <div class="detail-top-nav">
+          <a href="#results" class="back-link"><i data-icon="arrow-left"></i>라이브러리로 돌아가기</a>
+          <div class="detail-post-selector">
+            <label for="detail-post-select">게시글 선택</label>
+            <select id="detail-post-select" aria-label="You선생 페이지 게시글 선택"></select>
+          </div>
+        </div>
+        <div class="detail-heading">
+          <div class="detail-badges">
+            <span class="tag tag-blue" id="detail-category-badge">1. 기도</span>
+            <span class="draft-badge" id="detail-status-badge"><span></span>공개 게시됨</span>
+          </div>
+          <div class="detail-title-row">
+            <h1 id="summary-title">AI 시대, 대체되지 않는 사람이 되는 법</h1>
+            <button type="button" class="title-edit-trigger" id="detail-title-edit-btn" title="요약본 제목 수정"><i data-icon="edit"></i>제목 수정</button>
+          </div>
+          <div class="detail-title-editor" id="detail-title-editor" hidden>
+            <input type="text" id="detail-title-input" class="template-input" maxlength="120" aria-label="요약본 제목 입력">
+            <button type="button" class="button primary" id="detail-title-save-btn"><i data-icon="check-circle"></i>제목 저장</button>
+            <button type="button" class="button secondary" id="detail-title-cancel-btn">취소</button>
+          </div>
+          <div class="detail-metadata">
+            <span id="detail-channel"><i data-icon="youtube"></i>EO 이오</span>
+            <span id="detail-date"><i data-icon="calendar"></i>작업일 2026.10.17</span>
+            <span id="detail-ratio-meta"><i data-icon="sliders"></i>요약률 30%</span>
+            <span id="detail-ai-meta"><i data-icon="sparkles"></i>GPT-4o</span>
+          </div>
+          <a class="source-link" id="detail-source-link" href="https://www.youtube.com/@eo_studio" target="_blank" rel="noopener noreferrer">https://www.youtube.com/@eo_studio <i data-icon="arrow-up-right"></i></a>
+        </div>
+        <div class="detail-actions">
+          <div class="detail-actions-left">
+            <button type="button" class="button primary" id="detail-tts-toggle-btn"><i data-icon="volume"></i><span id="detail-tts-btn-label">TTS 듣기</span></button>
+            <button type="button" class="button secondary" data-open="ratio"><i data-icon="sparkles"></i>재요약 · 요약률 변경</button>
+            <button type="button" class="button secondary" data-open="direct-content-summarize"><i data-icon="file"></i>텍스트 직접 요약</button>
+            <button type="button" class="button secondary" id="detail-category-edit-btn"><i data-icon="bookmark"></i>분류 수정</button>
+            <button type="button" class="button secondary" id="edit-button"><i data-icon="edit"></i>내용·핵심 수정</button>
+            <button type="button" class="button primary" id="save-edit-button" hidden><i data-icon="check-circle"></i>수정본 저장</button>
+            <button type="button" class="button secondary" id="cancel-edit-button" hidden>편집 취소</button>
+          </div>
+          <div class="detail-actions-right">
+            <details class="export-dropdown" id="detail-export-dropdown">
+              <summary class="button secondary"><i data-icon="file"></i>내보내기 <i data-icon="chevron-down"></i></summary>
+              <div class="export-dropdown-menu">
+                <button type="button" id="detail-copy-summary-btn"><i data-icon="file"></i>전체 클립보드 복사</button>
+                <button type="button" id="detail-export-md-btn">Markdown (.md) 저장</button>
+                <button type="button" id="detail-export-txt-btn">텍스트 (.txt) 저장</button>
+                <button type="button" id="detail-print-pdf-btn">인쇄 / PDF 저장</button>
+              </div>
+            </details>
+            <button type="button" class="button kakao-button" id="detail-kakao-share-btn"><i data-icon="message"></i>카톡 전송</button>
+            <button type="button" class="button secondary danger-button" id="detail-delete-btn"><i data-icon="trash"></i>삭제</button>
+            <button type="button" class="button primary" id="publish-button"><i data-icon="globe"></i><span id="publish-button-label">게시하기</span><i data-icon="arrow-up-right"></i></button>
+          </div>
+        </div>
+        <div class="tts-player-bar" id="tts-player-bar" hidden>
+          <div class="tts-player-main">
+            <span class="tts-badge"><i data-icon="volume"></i>TTS 음성 낭독</span>
+            <button type="button" class="tts-ctrl-btn" id="tts-prev-btn" title="이전 문장"><i data-icon="chevron-left"></i></button>
+            <button type="button" class="tts-ctrl-btn primary" id="tts-play-pause-btn" title="재생 / 일시정지"><i data-icon="pause"></i><span>일시정지</span></button>
+            <button type="button" class="tts-ctrl-btn" id="tts-next-btn" title="다음 문장"><i data-icon="chevron-right"></i></button>
+            <button type="button" class="tts-ctrl-btn danger" id="tts-stop-btn" title="낭독 정지"><i data-icon="stop"></i><span>정지</span></button>
+            <span class="tts-progress-text" id="tts-progress-text">문장 1 / 10</span>
+          </div>
+          <div class="tts-player-options">
+            <label for="tts-scope-select">낭독 범위</label>
+            <select id="tts-scope-select">
+              <option value="all" selected>전체 ([1] 요약 + [2] 핵심)</option>
+              <option value="summary">[1] 요약 본문만</option>
+              <option value="keypoints">[2] 핵심 요점만</option>
+            </select>
+            <label for="tts-rate-select">배속</label>
+            <select id="tts-rate-select">
+              <option value="0.85">0.85x (차분하게)</option>
+              <option value="1" selected>1.0x (보통)</option>
+              <option value="1.2">1.2x (조금 빠르게)</option>
+              <option value="1.4">1.4x (빠르게)</option>
+              <option value="1.6">1.6x (매우 빠르게)</option>
+            </select>
+            <label for="tts-voice-select">음성</label>
+            <select id="tts-voice-select" style="max-width:165px"></select>
+          </div>
+          <div class="tts-current-sentence" id="tts-current-sentence">낭독 준비 중...</div>
+        </div>
+        <div class="detail-layout"><article class="article-card"><div class="article-toolbar"><div class="version-tabs" role="tablist" aria-label="요약 버전"><button type="button" class="active" id="original-tab" role="tab" aria-selected="true" aria-controls="article-content" data-version="original"><i data-icon="file"></i>요약 원본</button><button type="button" id="edited-tab" role="tab" aria-selected="false" aria-controls="article-content" data-version="edited"><i data-icon="edit"></i>요약 수정본</button><button type="button" id="script-tab" role="tab" aria-selected="false" aria-controls="article-content" data-version="script"><i data-icon="list"></i>추출된 스크립트 원문</button></div><span class="reading-time" id="detail-reading-time"><i data-icon="clock"></i>약 3분 읽기</span></div><div class="editor-toolbar" id="editor-toolbar" hidden>
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;width:100%">
+            <span>에디터 도구</span>
+            <button type="button" data-cmd="bold" aria-label="굵게"><b>B</b></button>
+            <button type="button" data-cmd="italic" aria-label="기울임"><em>I</em></button>
+            <button type="button" data-cmd="insertUnorderedList" aria-label="목록"><i data-icon="list"></i></button>
+            <span class="editor-preview-note">직접 다듬거나 아래 AI 추가 요약 명령어로 수정본을 즉시 변환한 뒤 [수정본 저장]을 누르세요</span>
+          </div>
+          <div class="ai-edit-command-box" style="width:100%;margin-top:8px;padding:10px 12px;border-radius:10px;background:#f4f8f1;border:1px solid #cfe0c7;display:flex;flex-direction:column;gap:7px">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+              <strong style="font-size:12px;color:#1f331e;display:flex;align-items:center;gap:5px"><i data-icon="sparkles"></i>AI 추가 요약 · 편집 명령어</strong>
+              <div style="display:flex;gap:5px;flex-wrap:wrap">
+                <button type="button" class="script-action-btn secondary" data-ai-edit-preset="[2] 핵심을 '**핵심 소제목 (성경적 상징/이유)** + 핵심 키워드가 볼드(**) 강조된 설명 문장' 구조로 핵심만 뽑아 수정해줘" style="padding:3px 8px;font-size:11px;border-color:#d97706;color:#92400e;background:#fffbeb">★ 핵심을 [굵은 제목 + 설명] 형식으로 변환</button>
+                <button type="button" class="script-action-btn secondary" data-ai-edit-preset="성경 구절과 실제 예화를 더 풍부하고 상세하게 보강해줘" style="padding:3px 8px;font-size:11px">+ 예화·구절 상세 보강</button>
+                <button type="button" class="script-action-btn secondary" data-ai-edit-preset="전체 내용을 핵심 위주로 더 간결하고 읽기 쉽게 줄여줘" style="padding:3px 8px;font-size:11px">핵심 위주 간결 축약</button>
+                <button type="button" class="script-action-btn secondary" data-ai-edit-preset="소그룹 나눔용 묵상 질문 3가지와 합심 기도제목을 추가해줘" style="padding:3px 8px;font-size:11px">+ 묵상질문·기도제목 추가</button>
+              </div>
+            </div>
+            <div style="display:flex;gap:7px;align-items:center">
+              <input type="text" id="detail-ai-edit-prompt-input" class="template-input" placeholder="AI에게 시킬 추가 요약·수정 명령어를 입력하세요 (예: 각 항목마다 핵심 재료를 맨 앞에 강조해줘 / 기도제목을 끝에 추가해줘)" style="flex:1;min-height:36px;font-size:12.5px;background:#fff">
+              <button type="button" class="button primary" id="detail-ai-edit-run-btn" style="min-height:36px;padding:6px 14px;white-space:nowrap"><i data-icon="sparkles"></i>AI 명령 실행</button>
+            </div>
+          </div>
+        </div>
+        <div class="script-search-toolbar" id="script-search-toolbar" hidden>
+          <label class="search" style="flex:1;max-width:340px"><i data-icon="search"></i><input type="search" id="script-search-input" placeholder="스크립트 원문 내 단어 · 구절 검색 (실시간 필터링)"></label>
+          <span id="script-search-count" class="script-status-badge">타임스탬프를 클릭하면 우측 영상이 해당 시간으로 이동합니다</span>
+        </div>
+        <div class="article-content" id="article-content" role="tabpanel" aria-labelledby="original-tab"></div>
+            <div class="article-summary"><div class="summary-box-heading"><span class="hanaro-num-badge amber">2</span><h3>핵심</h3><span>KEY POINTS</span></div><ol class="hanaro-keypoints-list" id="detail-takeaways"></ol></div>
+          </article><aside class="detail-aside"><div class="contents-card"><span class="mini-label">IN THIS SUMMARY</span><h3>이번 요약의 흐름</h3><ol id="detail-outline"></ol><div class="form-divider"></div><span class="mini-label">ORIGINAL VIDEO PLAYER</span><div id="detail-video-embed-box" class="video-embed-container"><div class="video-preview"><span id="detail-preview-title">AI 시대,<br>나만의 경쟁력</span><i data-icon="play"></i><small id="detail-preview-channel">EO INSIGHTS</small></div></div><p class="video-preview-note">스크립트 탭의 타임스탬프 클릭 시 해당 시간으로 이동</p><a id="detail-aside-link" href="https://www.youtube.com/@eo_studio" target="_blank" rel="noopener noreferrer" class="text-button">유튜브 새 탭에서 보기<i data-icon="arrow-up-right"></i></a></div><p class="aside-disclaimer">최초 요약 원본은 그대로 보관돼요.<br>직접 다듬은 내용은 수정본에서 확인하세요.</p></aside></div>
+      </section>
+
+      <section id="view" class="page public-page" hidden aria-labelledby="public-title">
+        <div class="public-top"><a class="public-wordmark" href="#view" id="public-title">You선생<span>핵심 요약 라이브러리</span></a><div><a href="#results" class="text-button"><i data-icon="grid"></i>관리자</a><button class="button secondary bookmark-filter"><i data-icon="bookmark"></i>즐겨찾기<span>3</span></button></div></div>
+        <div class="public-list-heading" style="margin-top:8px"><h2>전체 요약 목록 <span>23</span></h2><label class="search"><i data-icon="search"></i><input type="search" aria-label="공개 요약 검색" placeholder="제목·채널·내용 검색"></label></div>
+        <div class="filter-tabs public-filters" aria-label="공개 목록 분류"></div>
+        <div class="public-list"></div>
+        <div class="public-pagination"><nav class="pagination" aria-label="공개 목록 페이지 선택"></nav></div>
+      </section>
+
+      <section id="github" class="page" hidden aria-labelledby="github-title">
+        <div class="page-heading">
+          <div>
+            <h1 id="github-title">깃허브 등록<span class="title-dot">.</span></h1>
+            <p>깃허브 계정과 등록 경로를 설정하고, You선생 소스를 자동 업로드하며 웹·서버 통신 상태를 실시간 점검하세요.</p>
+          </div>
+          <a href="#results" class="button secondary"><i data-icon="arrow-left"></i>라이브러리</a>
+        </div>
+
+        <div class="creation-layout" style="grid-template-columns:minmax(0,1fr)">
+          <div class="creation-main">
+            <!-- 1. 깃허브 등록 아이디, 패스워드, 등록경로 입력 -->
+            <div class="form-card" id="github-config-card">
+              <div class="card-heading">
+                <span class="step-number">01</span>
+                <div>
+                  <h2>깃허브 계정 및 등록 경로 설정</h2>
+                  <p>깃허브 아이디, 패스워드(Personal Access Token 권장), 저장소 등록 경로(URL 또는 owner/repo)를 입력하세요.</p>
+                </div>
+                <i data-icon="link"></i>
+              </div>
+
+              <div class="algo-form-grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px">
+                <div>
+                  <label class="field-label" for="gh-username-input">깃허브 아이디 (Username) <span>*</span></label>
+                  <input type="text" id="gh-username-input" class="template-input" placeholder="예: daehann" autocomplete="username">
+                </div>
+                <div>
+                  <label class="field-label" for="gh-password-input">패스워드 / 인증 토큰 (PAT) <span>*</span></label>
+                  <div style="display:flex;gap:6px">
+                    <input type="password" id="gh-password-input" class="template-input" placeholder="ghp_... 또는 우측 [웹 로그인 자동인증] 클릭" autocomplete="current-password" style="flex:1">
+                    <button type="button" class="button secondary" id="gh-device-auth-btn" style="min-height:38px;padding:6px 10px;font-size:11px;white-space:nowrap" title="깃허브 아이디·패스워드로 웹에서 로그인하여 업로드 토큰을 자동 발급받습니다"><i data-icon="lock"></i>웹 로그인 자동인증</button>
+                  </div>
+                </div>
+                <div>
+                  <label class="field-label" for="gh-repo-path-input">깃허브 등록 경로 (저장소 URL 또는 owner/repo) <span>*</span></label>
+                  <input type="text" id="gh-repo-path-input" class="template-input" placeholder="예: https://github.com/daehann/yousunsaeng 또는 daehann/yousunsaeng">
+                </div>
+                <div>
+                  <label class="field-label" for="gh-branch-input">대상 브랜치 및 하위 폴더 경로 (선택)</label>
+                  <div style="display:flex;gap:8px">
+                    <input type="text" id="gh-branch-input" class="template-input" value="main" placeholder="브랜치 (main)" style="width:110px" aria-label="대상 브랜치">
+                    <input type="text" id="gh-subpath-input" class="template-input" placeholder="하위 폴더 (루트면 비워둠, 예: docs)" style="flex:1" aria-label="저장소 내 하위 폴더 경로">
+                  </div>
+                </div>
+              </div>
+
+              <div id="gh-device-auth-banner" hidden style="margin-top:12px;padding:12px 14px;border-radius:9px;background:#fffbeb;border:1px solid #f59e0b;color:#78350f;font-size:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+                <div>
+                  <strong>🔐 깃허브 웹 로그인 인증 코드: <code id="gh-device-user-code" style="font-size:15px;font-weight:800;padding:2px 8px;background:#fef3c7;border-radius:5px;color:#92400e">-</code></strong>
+                  <span id="gh-device-status-msg" style="margin-left:8px">열린 깃허브 창에 아이디·비밀번호로 로그인 후 위 8자리 코드를 입력하면 자동으로 토큰이 세팅되고 업로드가 진행됩니다.</span>
+                </div>
+                <a id="gh-device-verify-link" href="https://github.com/login/device" target="_blank" rel="noopener noreferrer" class="button primary" style="min-height:32px;padding:5px 12px;font-size:11.5px">깃허브 인증 창 열기 <i data-icon="arrow-up-right"></i></a>
+              </div>
+
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px dashed var(--line)">
+                <span class="field-help" style="margin:0"><i data-icon="info"></i>GitHub 정책상 Git/API 업로드는 계정 비밀번호 대신 <strong>Personal Access Token(repo 권한)</strong>을 패스워드 칸에 입력해야 정상 인증됩니다. 저장소가 없으면 업로드 시 자동 생성합니다.</span>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                  <button type="button" class="button secondary" id="gh-save-config-btn"><i data-icon="check-circle"></i>등록 정보 저장</button>
+                  <button type="button" class="button primary" id="gh-test-conn-btn"><i data-icon="globe"></i>통신 상태 즉시 점검</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2. 깃허브에 You선생 소스 자동 업로드 -->
+            <div class="form-card" id="github-upload-card">
+              <div class="card-heading">
+                <span class="step-number">02</span>
+                <div>
+                  <h2>You선생 소스 자동 업로드</h2>
+                  <p>로컬 서버의 You선생 핵심 소스 파일들을 지정한 깃허브 저장소 경로에 원클릭으로 자동 커밋·푸시(업로드)합니다.</p>
+                </div>
+                <i data-icon="share"></i>
+              </div>
+
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 14px;background:#f5f8f2;border:1px solid #d5e2ce;border-radius:9px;margin-bottom:14px">
+                <div style="display:flex;flex-direction:column;gap:4px">
+                  <strong style="font-size:12.5px;color:#233322">업로드 대상 소스 파일 목록 (웹/서버 핵심 구성)</strong>
+                  <span style="font-size:11px;color:#5a6b58"><code>index.html</code>, <code>app.js</code>, <code>styles.css</code>, <code>state-sync.js</code>, <code>pending-store.js</code>, <code>server.py</code>, <code>summary_quality.py</code> (업로드 시 API 키 등 민감 정보는 자동 제외)</span>
+                </div>
+                <label style="display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:#244b40;cursor:pointer">
+                  <input type="checkbox" id="gh-include-db-check" checked style="width:15px;height:15px;accent-color:#284e40">
+                  <span>공개 요약 DB(<code>summaries_db.json</code>, API 키 마스킹됨) 함께 업로드</span>
+                </label>
+              </div>
+
+              <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
+                <input type="text" id="gh-commit-msg-input" class="template-input" value="chore: You선생 소스 및 공개 요약 데이터 자동 업데이트" placeholder="커밋 메시지 입력" aria-label="깃허브 커밋 메시지" style="flex:1;min-width:220px">
+                <button type="button" class="button primary" id="gh-auto-upload-btn"><i data-icon="share"></i>You선생 소스 자동 업로드 실행</button>
+              </div>
+
+              <div id="gh-upload-progress-box" hidden style="padding:14px;border-radius:9px;background:#fafbf8;border:1px solid var(--line)">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                  <strong id="gh-upload-status-title" style="font-size:12.5px;color:#244b40">업로드 준비 중...</strong>
+                  <span id="gh-upload-percent" class="tag tag-sage">0%</span>
+                </div>
+                <div class="overall-progress-track" style="margin-bottom:10px">
+                  <div class="overall-progress-fill" id="gh-upload-bar" style="width:0%"></div>
+                </div>
+                <div id="gh-upload-file-log" style="max-height:190px;overflow-y:auto;font-size:11.5px;line-height:1.7;color:#3d4d3f;background:#fff;padding:10px 12px;border-radius:7px;border:1px solid #e6ece0"></div>
+              </div>
+            </div>
+
+            <!-- 3. 깃허브 웹과 서버 통신 점검 -->
+            <div class="form-card" id="github-health-card">
+              <div class="card-heading">
+                <span class="step-number">03</span>
+                <div>
+                  <h2>깃허브 웹 · 로컬 서버 통신 점검</h2>
+                  <p>로컬 요약 서버, 깃허브 API 인증, 대상 저장소 읽기/쓰기 권한, 깃허브 웹(GitHub.com / GitHub Pages)과의 양방향 통신이 원활한지 종합 점검합니다.</p>
+                </div>
+                <i data-icon="check-circle"></i>
+              </div>
+
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+                <span id="gh-check-summary-badge" class="tag tag-gray">아직 통신 점검을 실행하지 않았습니다.</span>
+                <button type="button" class="button secondary" id="gh-run-check-btn"><i data-icon="globe"></i>웹 · 서버 통신 정밀 점검 실행</button>
+              </div>
+
+              <div id="gh-check-results-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px">
+                <div class="stat-card" style="padding:14px 16px" data-gh-check-card="local_server">
+                  <span class="mini-label">LOCAL SERVER</span>
+                  <h3 style="margin:6px 0;font-size:13.5px">1. 로컬 You선생 서버 통신</h3>
+                  <p style="margin:0;font-size:11.5px;color:#687662" data-gh-check-msg="local_server">대기 중 · 점검 버튼을 눌러주세요.</p>
+                </div>
+                <div class="stat-card" style="padding:14px 16px" data-gh-check-card="github_web">
+                  <span class="mini-label">GITHUB WEB &amp; API</span>
+                  <h3 style="margin:6px 0;font-size:13.5px">2. 깃허브 웹(github.com) 응답</h3>
+                  <p style="margin:0;font-size:11.5px;color:#687662" data-gh-check-msg="github_web">대기 중 · 점검 버튼을 눌러주세요.</p>
+                </div>
+                <div class="stat-card" style="padding:14px 16px" data-gh-check-card="github_auth">
+                  <span class="mini-label">AUTHENTICATION</span>
+                  <h3 style="margin:6px 0;font-size:13.5px">3. 계정 아이디 · 패스워드(토큰) 인증</h3>
+                  <p style="margin:0;font-size:11.5px;color:#687662" data-gh-check-msg="github_auth">대기 중 · 점검 버튼을 눌러주세요.</p>
+                </div>
+                <div class="stat-card" style="padding:14px 16px" data-gh-check-card="github_repo">
+                  <span class="mini-label">REPOSITORY &amp; PAGES</span>
+                  <h3 style="margin:6px 0;font-size:13.5px">4. 등록 경로(저장소) 권한 및 웹 배포</h3>
+                  <p style="margin:0;font-size:11.5px;color:#687662" data-gh-check-msg="github_repo">대기 중 · 점검 버튼을 눌러주세요.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="categories" class="modal"><div class="modal-heading"><div><span class="eyebrow">ORGANIZE YOUR IDEAS</span><h2>내 분류 관리</h2></div><button class="icon-button" data-close aria-label="분류 관리 닫기"><i data-icon="x"></i></button></div><p class="modal-description">나만의 방식으로 지식을 정리하세요. 추가·수정·삭제가 즉시 반영됩니다.</p><div class="category-editor" id="category-editor-list"></div><div class="new-category-field"><input id="new-category-input" placeholder="새 분류 이름 입력" aria-label="새 분류 이름"><button type="button" class="button secondary" id="add-category-btn"><i data-icon="plus"></i>추가</button></div><p class="field-help">분류 삭제 시 해당 요약은 ‘미정’으로 이동해요.</p><div class="modal-footer"><span>변경사항은 자동 저장됩니다.</span><button type="button" class="button primary" data-close>완료</button></div></dialog>
+  <dialog id="category-picker" class="modal category-picker" aria-labelledby="category-picker-title">
+    <div class="modal-heading"><h2 id="category-picker-title">동영상 저장 · 분류 선택</h2><button class="icon-button" data-close aria-label="분류 선택 닫기"><i data-icon="x"></i></button></div>
+    <p class="picker-description">영상 <span id="picker-entry-number">1</span> · 여러 분류를 선택할 수 있어요.</p>
+    <div class="category-checklist" id="category-checklist-box"></div>
+    <div class="picker-inline-add">
+      <input type="text" id="picker-new-category-input" placeholder="+ 새 재생목록 / 분류 이름 입력">
+      <button type="button" class="button" id="picker-add-category-btn">추가</button>
+    </div>
+    <p class="picker-note">미선택 시 ‘미정’으로 분류됩니다.</p>
+    <div class="picker-footer"><span>체크 후 선택 완료를 눌러주세요.</span><button type="button" class="button" id="apply-category">선택 완료</button></div>
+  </dialog>
+  <dialog id="share" class="modal share-modal" aria-labelledby="kakao-share-title">
+    <div class="modal-heading"><h2 id="kakao-share-title">카카오톡으로 전송</h2><button class="icon-button" data-close aria-label="카카오톡 전송 창 닫기"><i data-icon="x"></i></button></div>
+    <p class="modal-description">You선생 공개 페이지 주소로 카카오톡 앱을 불러와 전송합니다.</p>
+    <div class="kakao-card">
+      <div class="kakao-card-label"><i data-icon="message"></i>You선생 공개 페이지 공유</div>
+      <h3 id="kakao-video-title">AI 시대, 대체되지 않는 사람이 되는 법</h3>
+      <p id="kakao-video-desc">영상 속 핵심을 You선생에서 읽어보세요.</p>
+      <div class="kakao-public-url-box">
+        <label class="field-label" for="kakao-public-url-input">You선생 공개 페이지 주소</label>
+        <input id="kakao-public-url-input" class="template-input" readonly>
+      </div>
+      <div id="kakao-preview-link-btn" style="cursor:pointer">You선생 공개 페이지에서 바로 보기<i data-icon="arrow-up-right"></i></div>
+    </div>
+    <details class="api-key-details" style="margin-top:12px">
+      <summary><i data-icon="settings"></i>Kakao JavaScript 키 설정 (선택사항 · 입력 시 공식 카카오 SDK 공유창 호출)</summary>
+      <div class="api-key-box">
+        <input type="text" id="kakao-js-key-input" class="template-input" placeholder="카카오 개발자 JavaScript 키 입력 (미입력 시 카카오톡 앱/공유창 직접 호출)">
+      </div>
+    </details>
+    <div class="modal-footer">
+      <button type="button" class="button secondary" id="kakao-copy-url-btn"><i data-icon="link"></i>공개 주소 복사</button>
+      <button type="button" class="button kakao-button" id="kakao-send-btn"><i data-icon="message"></i>카카오톡 불러와서 전송</button>
+    </div>
+  </dialog>
+  <dialog id="template-add" class="modal" aria-labelledby="template-add-title">
+    <div class="modal-heading"><h2 id="template-add-title">요약 서식 설정</h2><button class="icon-button" data-close aria-label="서식 창 닫기"><i data-icon="x"></i></button></div>
+    <p class="modal-description">정형 서식(대주제·소주제·핵심) 또는 원하는 양식 그대로 출력하는 <strong>자유형식(Free-form) 서식</strong>을 설정하세요.</p>
+    <form id="template-form">
+      <input type="hidden" id="template-edit-id">
+      <label class="field-label" for="template-name">서식 이름 <span>*</span></label>
+      <input class="template-input" id="template-name" placeholder="예: 자유형식 (나만의 맞춤 양식) / 설교 묵상 노트" required maxlength="40">
+      <label class="field-label template-body-label" for="template-desc">서식 설명</label>
+      <input class="template-input" id="template-desc" placeholder="예: 정해진 틀 없이 내가 입력한 양식·목차·프롬프트 그대로 자유롭게 요약합니다." maxlength="120">
+      <div style="margin-top:10px;padding:10px 12px;border-radius:10px;background:#f5f8f2;border:1px solid #d5e2ce;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;color:#233322;cursor:pointer">
+          <input type="checkbox" id="template-freeform-check" style="width:16px;height:16px">
+          <span>✨ 자유형식(Free-form) 모드 사용 (고정된 대주제·소주제 개수 제한 없이 아래 양식대로 자유 생성)</span>
+        </label>
+      </div>
+      <div id="template-freeform-presets" style="margin-top:8px;display:none;gap:6px;flex-wrap:wrap;align-items:center">
+        <span style="font-size:11px;color:#5a6b58;font-weight:600">자유양식 예시 불러오기:</span>
+        <button type="button" class="script-action-btn secondary" data-freeform-preset="essay" style="padding:4px 9px;font-size:11px">에세이·칼럼형</button>
+        <button type="button" class="script-action-btn secondary" data-freeform-preset="qna" style="padding:4px 9px;font-size:11px">Q&amp;A 질문·답변형</button>
+        <button type="button" class="script-action-btn secondary" data-freeform-preset="qt" style="padding:4px 9px;font-size:11px">설교 묵상·기도제목형</button>
+        <button type="button" class="script-action-btn secondary" data-freeform-preset="timeline" style="padding:4px 9px;font-size:11px">시간순 스토리텔링형</button>
+      </div>
+      <div class="algo-form-grid" id="template-structured-grid">
+        <div>
+          <label class="field-label" for="template-chapters">대주제(## 1.~) 개수</label>
+          <select id="template-chapters"><option value="0">자유 구성 (개수 제한 없음)</option><option value="3">3개 대주제</option><option value="4">4개 대주제</option><option value="6">6개 대주제</option><option value="8">8개 대주제</option><option value="11" selected>11개 대주제 (표준)</option></select>
+        </div>
+        <div>
+          <label class="field-label" for="template-subs">대주제당 소주제(###) 수</label>
+          <select id="template-subs"><option value="0">자유 구성 (제한 없음)</option><option value="2" selected>2~3개 소주제 (표준)</option><option value="3">3개 소주제</option><option value="4">4개 소주제</option></select>
+        </div>
+        <div>
+          <label class="field-label" for="template-keypoints">하단 [2. 핵심] 번호 개수</label>
+          <select id="template-keypoints"><option value="0">자유 개수 (AI 자율 추출)</option><option value="5">5개 핵심 요점</option><option value="8">8개 핵심 요점</option><option value="12">12개 핵심 요점</option><option value="16" selected>16개 핵심 요점 (표준)</option><option value="18">18개 핵심 요점</option></select>
+        </div>
+        <div>
+          <label class="field-label" for="template-tone">문단 종결 어조</label>
+          <select id="template-tone"><option value="formal" selected>정중체 (~합니다 / ~세요)</option><option value="hanaro">부드러운 권면체 (~해요 / ~하십시오)</option><option value="free">자유 어조 (프롬프트 지침 따름)</option></select>
+        </div>
+      </div>
+      <label class="field-label template-body-label" for="template-body" id="template-body-label-text">서식 요약 규칙 및 자유 양식 지침 <span>*</span></label>
+      <textarea class="template-input" id="template-body" rows="7" placeholder="원하는 요약 양식, 목차 구성, 문체, 포함할 항목 등을 자유롭게 작성하세요.&#10;예시:&#10;- 본문 성경 구절과 설교 핵심 주제를 맨 위에 한 줄로 제시&#10;- 서론 / 본론(핵심 대지 3가지와 예화) / 결론 및 삶에 적용할 질문 3가지로 자유롭게 구성&#10;- 마지막에는 함께 기도할 제목과 한 줄 핵심 문장 정리" required maxlength="4000"></textarea>
+      <p class="template-error" id="template-error" role="alert" hidden></p>
+      <div class="modal-footer"><span>저장한 서식은 즉시 요약 및 재요약에 사용할 수 있습니다.</span><button class="button primary" type="submit" id="template-submit-btn"><i data-icon="check-circle"></i>서식 저장</button></div>
+    </form>
+  </dialog>
+  <dialog id="direct-content-summarize" class="modal" aria-labelledby="direct-summarize-title">
+    <div class="modal-heading">
+      <div><span class="eyebrow">CONTENT SUMMARIZATION</span><h2 id="direct-summarize-title">내용 요약 (스크립트 · 설교문 · 텍스트)</h2></div>
+      <button class="icon-button" data-close aria-label="내용 요약 창 닫기"><i data-icon="x"></i></button>
+    </div>
+    <p class="modal-description">요약할 원문 텍스트나 스크립트를 입력하면 현재 설정된 요약 알고리즘과 서식으로 즉시 요약하여 [요약 원본]에 기록합니다.</p>
+    <label class="field-label" for="direct-summarize-input">요약할 원문 내용 <span>*</span></label>
+    <textarea id="direct-summarize-input" class="template-input" rows="7" placeholder="여기에 설교문, 강연 원고, 유튜브 스크립트 등 요약할 텍스트를 붙여넣으세요.&#10;(비워두면 현재 영상의 유튜브 자막 스크립트를 자동으로 가져와 요약합니다)"></textarea>
+    <label class="field-label" for="direct-summarize-extra-prompt" style="margin-top:10px;display:block">✨ AI 추가 요약 명령어 (선택사항 · 원하는 방향이나 강조점 지시)</label>
+    <input type="text" id="direct-summarize-extra-prompt" class="template-input" placeholder="예: 성경 구절과 예화를 자세히 살려줘 / 재료와 조리법 위주로 요약해줘 / 끝에 적용 질문 3개를 넣어줘">
+    <div class="modal-footer">
+      <span>설정한 서식과 추가 요약 명령어가 함께 적용됩니다.</span>
+      <button type="button" class="button primary" id="run-direct-summarize-btn"><i data-icon="sparkles"></i>내용 요약 실행</button>
+    </div>
+  </dialog>
+  <dialog id="delete-confirm-modal" class="modal" aria-labelledby="delete-confirm-title">
+    <div class="modal-heading">
+      <h2 id="delete-confirm-title">요약 게시글 삭제</h2>
+      <button class="icon-button" data-close aria-label="삭제 창 닫기"><i data-icon="x"></i></button>
+    </div>
+    <p class="modal-description" id="delete-confirm-desc">이 요약본을 정말 삭제하시겠습니까?</p>
+    <div class="modal-footer">
+      <button type="button" class="button secondary" data-close>취소</button>
+      <button type="button" class="button primary danger-solid" id="confirm-delete-btn"><i data-icon="trash"></i>삭제 확인</button>
+    </div>
+  </dialog>
+  <dialog id="ratio" class="modal">
+    <div class="modal-heading"><h2>재요약 · 요약률 및 서식 변경</h2><button class="icon-button" data-close aria-label="요약률 창 닫기"><i data-icon="x"></i></button></div>
+    <p class="modal-description">원하는 요약률, 요약 서식, 추가 AI 명령어를 입력해 즉시 다시 요약합니다.</p>
+    <label class="field-label" for="detail-ratio">요약률 <strong id="detail-ratio-label">30%</strong> (대주제·핵심 개수 자동 연동)</label>
+    <input class="ratio-range" id="detail-ratio" type="range" min="10" max="70" step="10" value="30">
+    <div class="range-labels"><span>10% · 핵심만 간결하게</span><span>70% · 맥락까지 자세하게</span></div>
+    <div style="margin-top:12px">
+      <label class="field-label" for="detail-resum-template">적용할 요약 서식</label>
+      <select id="detail-resum-template" data-template-select></select>
+    </div>
+    <div style="margin-top:12px">
+      <label class="field-label" for="detail-resum-extra-prompt">✨ AI 추가 요약 명령어 (선택사항)</label>
+      <input type="text" id="detail-resum-extra-prompt" class="template-input" placeholder="예: 예화와 성경 본문을 더 상세히 작성해줘 / 청년부 눈높이에 맞춰 적용점을 써줘">
+    </div>
+    <label class="overwrite-edit-check" style="display:flex;align-items:center;gap:7px;margin-top:14px;font-size:11px;color:#5f7056;cursor:pointer">
+      <input type="checkbox" id="detail-overwrite-edited">
+      <span>재요약 결과로 [요약 수정본]도 함께 초기화하기 (미체크 시 기존 수정본 보존)</span>
+    </label>
+    <div class="modal-footer"><span>재요약 결과는 [요약 원본]에 즉시 기록됩니다.</span><button type="button" class="button primary" id="apply-ratio-btn"><i data-icon="sparkles"></i>다시 요약하기</button></div>
+  </dialog>
+  <dialog id="public-reader-modal" class="modal reader-modal" aria-labelledby="reader-modal-title">
+    <div class="reader-modal-top">
+      <div class="detail-badges" style="margin:0">
+        <span class="tag tag-sage" id="reader-category-badge">1. 기도</span>
+        <button type="button" class="button secondary" id="reader-category-edit-btn" style="min-height:26px;padding:3px 8px;font-size:10.5px"><i data-icon="bookmark"></i>분류 수정</button>
+        <span class="public-date" id="reader-date">2026.10.17</span>
+        <span class="public-date" id="reader-channel">채널명</span>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <button type="button" class="button primary" id="reader-tts-btn" style="min-height:32px;padding:6px 11px;font-size:11px"><i data-icon="volume"></i><span id="reader-tts-label">TTS 듣기</span></button>
+        <button type="button" class="button secondary" id="reader-bookmark-btn" style="min-height:32px;padding:6px 10px;font-size:11px"><i data-icon="bookmark"></i>즐겨찾기</button>
+        <button type="button" class="button kakao-button" id="reader-kakao-btn" style="min-height:32px;padding:6px 10px;font-size:11px"><i data-icon="message"></i>카톡 공유</button>
+        <a id="reader-youtube-link" href="https://www.youtube.com/" target="_blank" rel="noopener noreferrer" class="button secondary" style="min-height:32px;padding:6px 10px;font-size:11px"><i data-icon="youtube"></i>원본 영상</a>
+        <button type="button" class="button secondary" id="reader-admin-edit-btn" style="min-height:32px;padding:6px 10px;font-size:11px"><i data-icon="edit"></i>관리자 편집</button>
+        <button type="button" class="icon-button" data-close aria-label="리더 모달 닫기"><i data-icon="x"></i></button>
+      </div>
+    </div>
+    <h2 id="reader-modal-title" class="reader-title">요약 제목</h2>
+    <div class="reader-body-scroll">
+      <div class="article-content" id="reader-article-content" style="padding:18px 4px"></div>
+      <div class="article-summary" style="margin:10px 0 0"><div class="summary-box-heading"><span class="hanaro-num-badge amber">2</span><h3>핵심</h3><span>KEY POINTS</span></div><ol class="hanaro-keypoints-list" id="reader-takeaways"></ol></div>
+    </div>
+  </dialog>
+  <dialog id="vscode-account" class="modal" aria-labelledby="vscode-account-title">
+    <div class="modal-heading">
+      <div><span class="eyebrow">VS CODE AUTHENTICATION</span><h2 id="vscode-account-title">VS Code 계정 선택</h2></div>
+      <button class="icon-button" data-close aria-label="계정 선택 닫기"><i data-icon="x"></i></button>
+    </div>
+    <p class="modal-description">요약 워크스페이스 및 Copilot AI 모델과 연동할 VS Code 계정을 선택하세요.</p>
+    <div class="account-list" id="vscode-account-list"></div>
+    <div class="new-category-field">
+      <input id="new-account-name" placeholder="계정 이름 (예: 홍길동)" aria-label="새 계정 이름">
+      <select id="new-account-provider" style="width:140px"><option value="GitHub">GitHub</option><option value="Microsoft">Microsoft</option></select>
+      <button type="button" class="button secondary" id="add-account-btn"><i data-icon="plus"></i>계정 추가</button>
+    </div>
+    <div class="modal-footer">
+      <span>선택한 계정 기준으로 워크스페이스가 동기화됩니다.</span>
+      <button type="button" class="button primary" data-close>확인</button>
+    </div>
+  </dialog>
+  <dialog id="audio-fallback-modal" class="modal" aria-labelledby="audio-fallback-title">
+    <div class="modal-heading">
+      <div><span class="eyebrow" style="color:#b45309">NO CAPTIONS DETECTED · 오디오 AI 분석 지원</span><h2 id="audio-fallback-title">자막이 없는 영상입니다. 오디오 파일로 요약할까요?</h2></div>
+      <button class="icon-button" id="audio-fallback-cancel-x" aria-label="창 닫기"><i data-icon="x"></i></button>
+    </div>
+    <p class="modal-description" id="audio-fallback-desc">이 유튜브 영상은 자막(스크립트)이 제공되지 않습니다. 오디오(음성)를 추출하거나 오디오 파일을 업로드하여 AI가 직접 듣고 요약하도록 진행하시겠습니까?</p>
+    <div style="background:#f8faf6;border:1px solid #d8e2d3;border-radius:12px;padding:12px 14px;margin:10px 0;font-size:12px;color:#2f3e2e">
+      <div style="font-weight:700;margin-bottom:6px">🎵 방법 1. 유튜브 영상에서 오디오 자동 추출 (권장)</div>
+      <p style="margin:0;color:#5a6b58;font-size:11.5px">서버가 유튜브 영상의 오디오 스트림(m4a)을 자동으로 추출하여 Gemini AI에 전달해 설교·강연 전체를 듣고 요약합니다.</p>
+    </div>
+    <div style="background:#fcfbf7;border:1px solid #e6dec8;border-radius:12px;padding:12px 14px;margin:10px 0;font-size:12px;color:#3f3826">
+      <div style="font-weight:700;margin-bottom:6px">📂 방법 2. 내 기기의 오디오 파일(.mp3, .m4a, .wav) 직접 첨부 (선택사항)</div>
+      <input type="file" id="audio-fallback-file-input" accept="audio/*,.mp3,.m4a,.wav,.webm,.ogg" style="font-size:11.5px;width:100%">
+      <small id="audio-fallback-file-label" style="display:block;margin-top:4px;color:#786c4f;font-size:11px">파일을 선택하지 않으면 방법 1(유튜브 오디오 자동 추출)로 진행됩니다.</small>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="button secondary" id="audio-fallback-skip-btn">이 영상 건너뛰기 (원문 없음)</button>
+      <button type="button" class="button primary" id="audio-fallback-confirm-btn"><i data-icon="volume"></i>예, 오디오로 AI 요약 진행</button>
+    </div>
+  </dialog>
+  <div class="toast" id="demo-toast" role="status" hidden><i data-icon="info"></i><span id="toast-message">처리가 완료되었습니다.</span></div>
+</body>
+</html>
