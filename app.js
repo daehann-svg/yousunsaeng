@@ -513,6 +513,42 @@ function askUserForAudioFallback(videoTitle = "YouTube 영상", videoUrl = "") {
   });
 }
 
+const BROWSER_SUMMARY_RESPONSE_SCHEMA = {
+  type: "OBJECT",
+  required: ["docTitle", "chapters", "keypoints"],
+  properties: {
+    docTitle: { type: "STRING" },
+    chapters: {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        required: ["num", "title", "subs"],
+        properties: {
+          num: { type: "STRING" },
+          title: { type: "STRING" },
+          subs: {
+            type: "ARRAY",
+            items: {
+              type: "OBJECT",
+              required: ["title", "body"],
+              properties: {
+                code: { type: "STRING" },
+                title: { type: "STRING" },
+                body: { type: "STRING" },
+                evidence: { type: "ARRAY", items: { type: "STRING" } }
+              }
+            }
+          }
+        }
+      }
+    },
+    keypoints: {
+      type: "ARRAY",
+      items: { type: "STRING" }
+    }
+  }
+};
+
 async function summarizeYoutubeOrAudioViaBrowserGemini({
   url,
   title,
@@ -531,43 +567,16 @@ async function summarizeYoutubeOrAudioViaBrowserGemini({
   const isFreeform = Boolean(tplObj.isFreeform) || Number(tplObj.chapterCount) === 0 || String(tplObj.name || "").includes("자유");
   const baseChapters = Number(tplObj.chapterCount || 11);
   const baseSubs = Number(tplObj.subsPerChapter || 2);
+  const baseKp = Number(tplObj.keypointCount || 16);
   const chapterCount = isFreeform
     ? 0
     : customSections && customSections.length
     ? customSections.length
-    : Math.max(3, Math.min(12, Math.round(baseChapters * (r / 30))));
+    : Math.max(4, Math.min(13, Math.round(baseChapters * (r / 30))));
   const subsPerChapter = isFreeform ? 0 : r <= 10 ? 1 : r <= 30 ? 2 : Math.min(4, baseSubs + 1);
+  const kpCount = isFreeform ? 12 : Math.max(8, Math.min(20, Math.round(baseKp * (r / 30))));
   const cleanTitleTheme = String(title || "핵심 주제").split(/\s*[|｜]\s*/)[0].trim();
   const baseRules = String(tplObj.rules || tplObj.body || "");
-
-  const sysPrompt = `당신은 설교·강연 유튜브 영상을 깊이 있고 충실한 아티클로 요약하는 전문 에디터입니다.
-반드시 아래 JSON 스키마로만 응답하세요:
-{
-  "docTitle": "${cleanTitleTheme}",
-  "chapters": [
-    {
-      "num": "1",
-      "title": "${cleanTitleTheme}",
-      "subs": [
-        {
-          "code": "",
-          "title": "소제목",
-          "body": "구체적인 성경 본문과 배경을 설명하는 첫 문장입니다. 설교자가 든 실제 예화와 핵심 원리를 짚어 주는 두 번째 문장입니다. 삶에서 결단해야 할 방향을 제시하는 세 번째 문장입니다."
-        }
-      ]
-    }
-  ],
-  "keypoints": [
-    "**핵심 소제목 (성경적 상징/핵심 원인)**\\n구체적인 이유와 **핵심 키워드**가 볼드(**) 강조된 1~2문장 설명"
-  ],
-  "transcriptSegments": [
-    { "time": "00:00", "text": "영상의 주요 발언 요약 스크립트" }
-  ]
-}
-- [1] 요약(chapters): ${isFreeform ? "자유형식 지침에 따라" : `대주제 ${chapterCount}개, 각 대주제당 소제목 ${subsPerChapter}~3개로`} 정중체(~합니다) 3문장 문단으로 깊이 있게 작성하세요.
-- [2] 핵심(keypoints): **핵심 소제목 (상징/원인)** + 줄바꿈 + **핵심 키워드** 볼드 강조 설명 구조로 10~16개 작성하세요.
-- transcriptSegments: 영상 흐름에 따른 주요 구간별 발언(10~25개 구간)을 시간과 함께 기록하세요.
-${baseRules}`;
 
   const mediaPart = audioBase64
     ? {
@@ -583,9 +592,125 @@ ${baseRules}`;
         }
       };
 
-  const models = ["gemini-3.5-flash-lite", "gemini-flash-lite-latest", "gemini-2.5-flash", "gemini-3.8-flash"];
+  // Prioritize flagship high-intelligence models (gemini-2.5-flash, gemini-3.8-flash, gemini-2.5-pro) over lite models
+  const primaryModels = ["gemini-2.5-flash", "gemini-3.8-flash", "gemini-2.5-pro", "gemini-3.5-flash", "gemini-flash-latest"];
+
+  // PASS 1: Extract full chronological transcript & detailed sermon/lecture notes from the video/audio first
+  // This prevents token starvation where 1-pass generation sacrifices summary depth.
+  let extractedSegments = [];
+  const pass1Schema = {
+    type: "OBJECT",
+    required: ["segments"],
+    properties: {
+      segments: {
+        type: "ARRAY",
+        items: {
+          type: "OBJECT",
+          required: ["time", "text"],
+          properties: {
+            time: { type: "STRING" },
+            text: { type: "STRING" }
+          }
+        }
+      }
+    }
+  };
+
+  for (const m of primaryModels.slice(0, 3)) {
+    try {
+      const p1Resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${encodeURIComponent(key)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(180000),
+        body: JSON.stringify({
+          systemInstruction: {
+            parts: [
+              {
+                text: "당신은 유튜브 설교·강연 영상의 전체 발언을 빠짐없이 정밀하게 기록하는 전문 속기사입니다. 도입부부터 중반부, 결론부까지 등장하는 모든 성경 구절, 핵심 논점, 구체적 예화, 수치, 고유명사, 권면 사항을 시간순으로 최소 30~60개 구간(segments)으로 상세히 전사하세요."
+              }
+            ]
+          },
+          contents: [
+            {
+              role: "user",
+              parts: [
+                mediaPart,
+                {
+                  text: `영상 제목: ${title}\n채널명: ${channel}\n위 영상의 처음부터 끝까지 모든 핵심 발언과 성경 구절, 예화, 세부 설명을 시간순 구간(segments)으로 상세히 전사해 주세요.`
+                }
+              ]
+            }
+          ],
+          generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 32768,
+            responseMimeType: "application/json",
+            responseSchema: pass1Schema
+          }
+        })
+      });
+      if (p1Resp.ok) {
+        const p1Json = await p1Resp.json();
+        const raw1 = (p1Json?.candidates?.[0]?.content?.parts || []).find((p) => p.text)?.text || "";
+        const parsed1 = JSON.parse(raw1);
+        if (parsed1 && Array.isArray(parsed1.segments) && parsed1.segments.length >= 8) {
+          extractedSegments = parsed1.segments.map((s, idx) => ({
+            start: idx * 15,
+            time: s.time || `${String(Math.floor((idx * 15) / 60)).padStart(2, "0")}:${String((idx * 15) % 60).padStart(2, "0")}`,
+            duration: 15,
+            text: String(s.text || "").trim()
+          })).filter((s) => s.text.length > 2);
+          break;
+        }
+      }
+    } catch (e) {
+      // If Pass 1 times out, proceed to Pass 2 direct multimodal deep summary
+    }
+  }
+
+  // If Pass 1 extracted rich transcript segments, run Pass 2 using the high-density text chunking & synthesis pipeline!
+  if (extractedSegments.length >= 10) {
+    const pass2Res = await summarizeDirectlyViaBrowserGemini(
+      extractedSegments,
+      title,
+      channel,
+      r,
+      tplObj,
+      customSections,
+      key,
+      ""
+    );
+    if (pass2Res && pass2Res.html) {
+      return {
+        ok: true,
+        engine: `${pass2Res.engine} (2단계 정밀 전사 + 심층 요약)`,
+        title: pass2Res.docTitle || title,
+        channel,
+        segments: extractedSegments,
+        html: pass2Res.html,
+        takeaways: pass2Res.takeaways || [],
+        outline: pass2Res.outline || [],
+        excerpt: pass2Res.excerpt,
+        quality: {
+          method: "web-two-pass-deep-ai",
+          sourceChars: extractedSegments.reduce((n, s) => n + (s.text || "").length, 0),
+          notice: `모바일/웹 2단계 심층 분석 완료 (전사 ${extractedSegments.length}구간 기반 고밀도 요약)`
+        }
+      };
+    }
+  }
+
+  // Direct High-Density Multimodal Fallback (using flagship models + 65536 maxOutputTokens + strict responseSchema)
+  const sysPrompt = `당신은 설교·강연 유튜브 영상을 가장 깊이 있고 충실한 아티클로 요약하는 수석 전문 에디터입니다.
+표면적인 한두 줄 요약은 절대 금지합니다. 영상의 도입부·중반부·결론부 전체를 빠짐없이 분석하여 다음 기준을 엄격히 지키세요:
+1. 첫 번째 대주제는 영상 제목의 핵심 주제('${cleanTitleTheme}')로 세우세요.
+2. [1] 요약(chapters): ${isFreeform ? "자유형식 지침에 따라" : `전체를 ${chapterCount}개 대주제(num: "1"~"${chapterCount}")로 나누고, 각 대주제 아래 소제목(subs) ${subsPerChapter}~3개를 구성하여`} 각 소제목 본문(body)을 반드시 **정중체(~합니다, ~야 합니다) 4~6문장(최소 220자 이상)**으로 깊이 있게 서술하세요. (반드시 언급된 성경 본문/배경 + 구체적인 예화·사례·비유 + 핵심 원리와 삶의 적용을 모두 포함할 것)
+3. 각 소제목의 evidence 배열에는 영상에서 실제로 언급된 핵심 문장이나 구절을 1~2개 그대로 기록하세요.
+4. [2] 핵심(keypoints): 총 ${kpCount}개 항목을 반드시 "**핵심 소제목 (성경적 상징/핵심 원인/핵심 개념)**\\n구체적인 이유와 **핵심 키워드**가 볼드(**) 강조된 2문장 설명"의 2단 구조로 작성하세요.
+${baseRules}`;
+
   let lastErr = "";
-  for (const m of models) {
+  for (const m of primaryModels) {
     try {
       const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${encodeURIComponent(key)}`, {
         method: "POST",
@@ -599,12 +724,17 @@ ${baseRules}`;
               parts: [
                 mediaPart,
                 {
-                  text: `영상 제목: ${title}\n채널명: ${channel}\n요약률: ${r}%\n서식: ${tplObj.name || "기본서식"}\n위 영상을 분석하여 JSON 형식으로 요약본(chapters, keypoints, transcriptSegments)을 작성해 주세요.`
+                  text: `영상 제목: ${title}\n채널명: ${channel}\n요약률: ${r}%\n서식: ${tplObj.name || "기본서식"}\n위 영상의 처음부터 끝까지 모든 논점, 성경 구절, 실제 예화, 결론을 누락 없이 반영하여 최고 품질의 심층 요약본을 작성해 주세요.`
                 }
               ]
             }
           ],
-          generationConfig: { temperature: 0.3, responseMimeType: "application/json" }
+          generationConfig: {
+            temperature: 0.15,
+            maxOutputTokens: 65536,
+            responseMimeType: "application/json",
+            responseSchema: BROWSER_SUMMARY_RESPONSE_SCHEMA
+          }
         })
       });
       if (!resp.ok) {
@@ -614,18 +744,13 @@ ${baseRules}`;
       }
       const rJson = await resp.json();
       const parts = rJson?.candidates?.[0]?.content?.parts || [];
-      const rawText = parts.find((p) => p.text)?.text || "";
+      const rawText = parts.filter((p) => !p.thought).map((p) => p.text || "").join("") || "";
       const match = rawText.match(/\{[\s\S]*\}/);
       if (!match) continue;
       const parsed = JSON.parse(match[0]);
       if (parsed && Array.isArray(parsed.chapters) && parsed.chapters.length) {
-        const segs = Array.isArray(parsed.transcriptSegments) && parsed.transcriptSegments.length
-          ? parsed.transcriptSegments.map((s, idx) => ({
-              start: idx * 15,
-              time: s.time || `${String(Math.floor((idx * 15) / 60)).padStart(2, "0")}:${String((idx * 15) % 60).padStart(2, "0")}`,
-              duration: 15,
-              text: s.text || ""
-            }))
+        const segs = extractedSegments.length
+          ? extractedSegments
           : parsed.chapters.flatMap((c, idx) =>
               (c.subs || []).map((sub, sIdx) => ({
                 start: (idx * 3 + sIdx) * 20,
@@ -636,18 +761,18 @@ ${baseRules}`;
             );
         return {
           ok: true,
-          engine: `${m} (웹 유튜브 직접 AI 요약)`,
+          engine: `${m} (고밀도 심층 AI 요약)`,
           title: parsed.docTitle || title,
           channel,
           segments: segs,
           html: renderHanaroChaptersHtml(parsed.chapters, r, tplObj.name, parsed.docTitle || title),
           takeaways: parsed.keypoints || [],
           outline: parsed.chapters.map((c) => c.title),
-          excerpt: parsed.chapters[0]?.subs?.[0]?.body?.slice(0, 115) || `${channel}의 ‘${title}’ 웹 AI 요약본입니다.`,
+          excerpt: parsed.chapters[0]?.subs?.[0]?.body?.slice(0, 115) || `${channel}의 ‘${title}’ 심층 AI 요약본입니다.`,
           quality: {
-            method: "web-youtube-direct-ai",
+            method: "web-youtube-deep-ai",
             sourceChars: segs.reduce((n, s) => n + (s.text || "").length, 0),
-            notice: "웹 브라우저에서 Gemini AI가 유튜브 영상을 직접 분석하여 생성한 요약본입니다."
+            notice: `모바일/웹 ${m} 고밀도 심층 요약 완료`
           }
         };
       }
@@ -790,7 +915,7 @@ function getSelectedModelApiKey() {
 }
 
 async function summarizeDirectlyViaBrowserGemini(segments, title, channel, ratio, tplObj, customSections, apiKey, extraCommand = "") {
-  const key = (apiKey || DEFAULT_GEMINI_KEY).trim();
+  const key = (apiKey || getSelectedModelApiKey() || state.modelApiKeys?.["free-gemini"] || state.apiKey || DEFAULT_GEMINI_KEY).trim();
   if (!key || !segments || !segments.length) return null;
 
   const r = Math.max(10, Math.min(70, Number(ratio) || 30));
@@ -804,21 +929,21 @@ async function summarizeDirectlyViaBrowserGemini(segments, title, channel, ratio
     ? 0
     : customSections && customSections.length
     ? customSections.length
-    : Math.max(3, Math.min(14, Math.round(baseChapters * (r / 30))));
+    : Math.max(4, Math.min(14, Math.round(baseChapters * (r / 30))));
   const subsPerChapter = isFreeform ? 0 : r <= 10 ? 1 : r <= 30 ? 2 : Math.min(4, baseSubs + 1);
-  const kpCount = isFreeform ? 0 : Math.max(5, Math.min(20, Math.round(baseKp * (r / 30))));
+  const kpCount = isFreeform ? 12 : Math.max(8, Math.min(20, Math.round(baseKp * (r / 30))));
 
-function extractCoreTitleTheme(videoTitle = "") {
-  const raw = String(videoTitle || "").trim();
-  if (!raw) return "핵심 주제";
-  let firstPart = raw.split(/\s*[|｜]\s*/)[0].trim();
-  firstPart = firstPart.replace(/^(?:\[[^\]]+\]\s*|\d+\.\s*)+/, "").trim();
-  const qMatch = firstPart.match(/^(.+?[?!])\s*(.*)$/);
-  if (qMatch && qMatch[1].trim().length >= 8) {
-    return qMatch[1].trim();
+  function extractCoreTitleTheme(videoTitle = "") {
+    const raw = String(videoTitle || "").trim();
+    if (!raw) return "핵심 주제";
+    let firstPart = raw.split(/\s*[|｜]\s*/)[0].trim();
+    firstPart = firstPart.replace(/^(?:\[[^\]]+\]\s*|\d+\.\s*)+/, "").trim();
+    const qMatch = firstPart.match(/^(.+?[?!])\s*(.*)$/);
+    if (qMatch && qMatch[1].trim().length >= 8) {
+      return qMatch[1].trim();
+    }
+    return firstPart;
   }
-  return firstPart;
-}
 
   const baseRules = String(tplObj.rules || tplObj.body || "").replace(/굵은\s*글씨\s*없이[^\n]*/g, "");
   const customRules = extraClean
@@ -826,63 +951,126 @@ function extractCoreTitleTheme(videoTitle = "") {
     : baseRules;
   const rulesNote = customRules ? `\n\n[사용자 지정 서식 상세 규칙]\n${customRules}` : "";
   const cleanTitleTheme = extractCoreTitleTheme(title);
-  const kpRuleText = `- [2] 핵심(keypoints): 서식 종류와 관계없이 모든 항목을 반드시 "**핵심 소제목 (성경적 상징/핵심 원인/핵심 개념)**\\n구체적인 이유와 **핵심 키워드**가 볼드(**) 강조된 1~2문장 설명"의 2단 구조로 작성하세요.`;
-  const sysPrompt = isFreeform
-    ? `당신은 설교·강연 유튜브 영상과 스크립트를 가장 깊이 있고 충실한 아티클로 요약하는 전문 에디터입니다.
-사용자가 자유형식(Free-form) 서식을 선택했습니다. 영상 제목의 핵심 주제('${cleanTitleTheme}')를 본문의 첫 대주제(##) 및 중심축으로 삼고 아래 사용자 양식 지침을 최우선으로 따라 구성하세요.${rulesNote}
-- 번호가 불필요한 섹션은 num을 ""(빈 문자열)로 두고, 소제목이 불필요한 문단은 subs의 title을 ""로 두어 본문(body)을 깊이 있게 작성하세요.
-${kpRuleText}
-JSON 응답 스키마:
-{"docTitle":"제목","isFreeform":true,"chapters":[{"num":"","title":"${cleanTitleTheme}","subs":[{"code":"","title":"항목명(생략가능)","body":"자유 양식 본문"}]}],"keypoints":["**성령의 감화와 감동의 부재 (금촛대)**\\n아무리 깊이 기도하고 학식이 높아도 **성령님의 지혜와 감동**이 없으면 영안이 열리지 않고 예수를 주로 시인할 수 없습니다."]}`
-    : `당신은 설교·강연 유튜브 영상과 스크립트를 가장 깊이 있고 충실한 아티클로 요약하는 전문 에디터입니다.
-주어진 설교·강연 스크립트를 정밀하게 분석하여 아래 JSON 형식으로만 응답하세요.${rulesNote}
-- 단순 시간순 나열이 아니라, 영상 제목의 핵심 주제('${cleanTitleTheme}')를 첫 번째 대주제(## 1. ${cleanTitleTheme})로 세우고, 본문 전체를 이 주제의 원인·성경적 상징·비유·실제 예화·해답 중심으로 깊이 있게 요약하세요.
-- [1] 요약(chapters): 영상 제목의 주제를 중심으로 전체를 ${chapterCount}개 대주제(num: "1"~"${chapterCount}")로 나누고, 각 대주제 아래 번호 없는 소제목(subs) ${subsPerChapter}~3개를 둔 뒤 정중체('~합니다.', '~야 합니다.', '~입니다.')로 완결된 밀도 있는 3~4문장(성경적 근거 + 구체적 예화/설명 + 삶의 적용)으로 본문(body)을 작성하세요.
-${kpRuleText}
-JSON 응답 스키마:
-{"docTitle":"제목","chapters":[{"num":"1","title":"${cleanTitleTheme}","subs":[{"code":"","title":"소제목","body":"구체적인 성경 본문과 배경을 설명하는 첫 문장입니다. 설교자가 든 실제 예화와 핵심 원리를 짚어 주는 두 번째 문장입니다. 이를 통해 성도가 삶에서 결단해야 할 방향을 제시하는 세 번째 문장입니다."}]}],"keypoints":["**성령의 감화와 감동의 부재 (금촛대)**\\n아무리 깊이 기도하고 학식이 높아도 **성령님의 지혜와 감동**이 없으면 영안이 열리지 않고 예수를 주로 시인할 수 없습니다."]}`;
+  const kpRuleText = `- [2] 핵심(keypoints): 서식 종류와 관계없이 총 ${kpCount}개 항목을 반드시 "**핵심 소제목 (성경적 상징/핵심 원인/핵심 개념)**\\n구체적인 이유와 **핵심 키워드**가 볼드(**) 강조된 2문장 설명"의 2단 구조로 작성하세요.`;
 
-  const cleanText = segments
+  const fullLines = segments
     .map((s) => (s.text || "").trim())
-    .filter((t) => t && !/^\[(음악|박수|웃음)\]$/.test(t))
-    .join(" ")
-    .slice(0, 50000);
+    .filter((t) => t && !/^\[(음악|박수|웃음)\]$/.test(t));
+  const fullText = fullLines.join("\n");
+  if (!fullText) return null;
 
-  const userPrompt = `영상 제목: ${title}\n본문 요약의 핵심 주제(첫 대주제 제목): ${cleanTitleTheme}\n채널명: ${channel}\n요약률: ${r}%\n\n[필수 지시] 서론의 배경 설명보다 영상 제목의 핵심 주제인 '${cleanTitleTheme}'에 대한 원인·성경적 상징·해답 중심으로 본문([1] 요약)과 [2] 핵심(**소제목 (상징/원인)**\\n**핵심어** 강조 설명)을 작성하세요.\n\n[스크립트 원문]\n${cleanText}`;
-  const models = ["gemini-3.5-flash-lite", "gemini-flash-lite-latest", "gemini-3.1-flash-lite", "gemini-3.8-flash"];
-
-  for (const m of models) {
-    try {
-      const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${encodeURIComponent(key)}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: sysPrompt }] },
-          contents: [{ role: "user", parts: [{ text: userPrompt }] }],
-          generationConfig: { temperature: 0.3, responseMimeType: "application/json" }
-        })
-      });
-      if (!resp.ok) continue;
-      const rJson = await resp.json();
-      const parts = rJson?.candidates?.[0]?.content?.parts || [];
-      const rawText = parts.find((p) => p.text)?.text || "";
-      const match = rawText.match(/\{[\s\S]*\}/);
-      if (!match) continue;
-      const parsed = JSON.parse(match[0]);
-      if (parsed && Array.isArray(parsed.chapters) && parsed.chapters.length) {
-        return {
-          engine: `${m} (GitHub/Mobile Direct)`,
-          html: renderHanaroChaptersHtml(parsed.chapters, r, tplObj.name, parsed.docTitle || title),
-          takeaways: parsed.keypoints || [],
-          outline: parsed.chapters.map((c) => c.title),
-          excerpt: parsed.chapters[0]?.subs?.[0]?.body?.slice(0, 115) || title
-        };
-      }
-    } catch (e) {
-      // try next model
-    }
+  // Split long transcripts into 24,000-character chunks (just like server summary_quality.py) so middle/late content is never lost
+  const CHUNK_LIMIT = 24000;
+  const chunks = [];
+  for (let start = 0; start < fullText.length; start += CHUNK_LIMIT) {
+    chunks.push(fullText.slice(start, start + CHUNK_LIMIT));
   }
-  return null;
+
+  // High-capability Gemini models first (gemini-2.5-flash / gemini-3.8-flash / gemini-2.5-pro)
+  const models = ["gemini-2.5-flash", "gemini-3.8-flash", "gemini-2.5-pro", "gemini-3.5-flash", "gemini-flash-latest"];
+
+  const callChunkModel = async (chunkText, chunkIdx, totalChunks) => {
+    const chunkChapterTarget = totalChunks > 1
+      ? Math.max(3, Math.ceil(chapterCount / totalChunks))
+      : chapterCount;
+    const sysPrompt = isFreeform
+      ? `당신은 설교·강연 원문을 가장 깊이 있고 충실한 아티클로 요약하는 수석 에디터입니다.
+원문에 없는 사실·성경 구절·예화를 지어내지 말고, 원문에 등장하는 모든 성경 구절·실제 예화·핵심 논리·적용점을 빠짐없이 깊이 있게 반영하세요.${rulesNote}
+- 각 소제목 본문(body)은 표면적인 요약을 피하고 최소 4~6문장(220자 이상)의 밀도 높은 정중체(~합니다) 문단으로 서술하세요.
+- 각 소제목의 evidence 배열에는 원문에서 그대로 발췌한 근거 구절을 1~2개 포함하세요.
+${kpRuleText}`
+      : `당신은 설교·강연 원문을 가장 깊이 있고 충실한 아티클로 요약하는 수석 에디터입니다.
+원문에 충실하게 분석하여 지정된 JSON 스키마로만 응답하세요.${rulesNote}
+- 단순 나열이 아니라 영상 제목의 핵심 주제('${cleanTitleTheme}')를 중심축으로 삼고, 원문 앞·중간·끝에 등장하는 성경 구절·배경·실제 예화·핵심 원리·삶의 결단을 빠짐없이 담으세요.
+- [1] 요약(chapters): 이 구간을 ${chunkChapterTarget}개 대주제로 나누고, 각 대주제 아래 소제목(subs) ${subsPerChapter}~3개를 둔 뒤, 각 본문(body)을 **정중체('~합니다.', '~야 합니다.')로 완결된 4~6문장(최소 220자 이상)**으로 깊이 있게 작성하세요.
+- 각 소제목의 evidence 배열에는 원문에서 그대로 인용한 문장을 1~2개 넣으세요.
+${kpRuleText}`;
+
+    const partLabel = totalChunks > 1 ? `\n[구간 안내: 전체 ${totalChunks}개 구간 중 ${chunkIdx + 1}번째 구간 원문]` : "";
+    const userPrompt = `영상 제목: ${title}\n본문 요약의 핵심 주제: ${cleanTitleTheme}\n채널명: ${channel}\n요약률 목표: ${r}% (충분히 상세하고 깊이 있게 작성할 것)${partLabel}\n\n[스크립트 원문]\n${chunkText}`;
+
+    for (const m of models) {
+      try {
+        const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${encodeURIComponent(key)}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: AbortSignal.timeout(150000),
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: sysPrompt }] },
+            contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+            generationConfig: {
+              temperature: 0.15,
+              maxOutputTokens: 65536,
+              responseMimeType: "application/json",
+              responseSchema: BROWSER_SUMMARY_RESPONSE_SCHEMA
+            }
+          })
+        });
+        if (!resp.ok) continue;
+        const rJson = await resp.json();
+        const parts = rJson?.candidates?.[0]?.content?.parts || [];
+        const rawText = parts.filter((p) => !p.thought).map((p) => p.text || "").join("") || "";
+        const match = rawText.match(/\{[\s\S]*\}/);
+        if (!match) continue;
+        const parsed = JSON.parse(match[0]);
+        if (parsed && Array.isArray(parsed.chapters) && parsed.chapters.length) {
+          return { model: m, parsed };
+        }
+      } catch (e) {
+        // try next model
+      }
+    }
+    return null;
+  };
+
+  const mergedChapters = [];
+  const mergedKeypoints = [];
+  let usedModel = "";
+  let finalDocTitle = title;
+
+  for (let i = 0; i < chunks.length; i++) {
+    const chunkRes = await callChunkModel(chunks[i], i, chunks.length);
+    if (!chunkRes) continue;
+    usedModel = chunkRes.model;
+    if (i === 0 && chunkRes.parsed.docTitle) {
+      finalDocTitle = chunkRes.parsed.docTitle;
+    }
+    (chunkRes.parsed.chapters || []).forEach((ch) => {
+      mergedChapters.push({
+        num: isFreeform ? (ch.num || "") : String(mergedChapters.length + 1),
+        title: String(ch.title || "").replace(/^\d+\.\s*/, "").trim(),
+        subs: (ch.subs || []).map((sub) => ({
+          code: "",
+          title: sub.title || "",
+          body: sub.body || "",
+          evidence: Array.isArray(sub.evidence) ? sub.evidence : []
+        }))
+      });
+    });
+    (chunkRes.parsed.keypoints || []).forEach((kp) => {
+      if (kp && !mergedKeypoints.includes(kp)) {
+        mergedKeypoints.push(kp);
+      }
+    });
+  }
+
+  if (!mergedChapters.length) return null;
+  const finalKeypoints = mergedKeypoints.slice(0, Math.max(kpCount, 12));
+
+  return {
+    docTitle: finalDocTitle,
+    engine: `${usedModel} (모바일/웹 고밀도 심층 요약${chunks.length > 1 ? ` · ${chunks.length}구간 정밀분석` : ""})`,
+    html: renderHanaroChaptersHtml(mergedChapters, r, tplObj.name, finalDocTitle),
+    takeaways: finalKeypoints,
+    outline: mergedChapters.map((c) => c.title),
+    excerpt: mergedChapters[0]?.subs?.[0]?.body?.slice(0, 115) || title,
+    quality: {
+      method: "web-browser-gemini-deep",
+      chunks: chunks.length,
+      sourceChars: fullText.length,
+      notice: `모바일/웹 ${usedModel} 심층 요약 완료 (원문 ${fullText.length.toLocaleString()}자 분석)`
+    }
+  };
 }
 
 function parseExhaustiveMarkdownInBrowser(segments, title = "전체 항목 요약", templateName = "자유형식") {
@@ -3173,11 +3361,12 @@ async function fetchYoutubeTranscriptInBrowser(url) {
     }
   }
 
-  // 2. Try CORS-enabled Piped stream APIs to fetch subtitles directly in browser
+  // 2. Try CORS-enabled Piped & Invidious caption endpoints directly in browser
   const pipedHosts = [
     "https://pipedapi.kavin.rocks",
     "https://pipedapi.tokhmi.xyz",
-    "https://pipedapi.moomoo.me"
+    "https://pipedapi.moomoo.me",
+    "https://pipedapi.syncpundit.io"
   ];
   for (const host of pipedHosts) {
     try {
@@ -3221,6 +3410,58 @@ async function fetchYoutubeTranscriptInBrowser(url) {
       }
     } catch (e) {
       // continue to next host
+    }
+  }
+
+  // 3. Try Invidious CORS API captions endpoint
+  const invidiousHosts = [
+    "https://inv.tux.pizza",
+    "https://invidious.nerdvpn.de",
+    "https://invidious.privacyredirect.com"
+  ];
+  for (const host of invidiousHosts) {
+    try {
+      const cRes = await fetch(`${host}/api/v1/captions/${encodeURIComponent(vid)}`, {
+        signal: AbortSignal.timeout(4500)
+      });
+      if (!cRes.ok) continue;
+      const cData = await cRes.json();
+      const tracks = Array.isArray(cData.captions) ? cData.captions : [];
+      const chosen =
+        tracks.find((t) => /^ko/i.test(t.language_code || "")) ||
+        tracks.find((t) => /^en/i.test(t.language_code || "")) ||
+        tracks[0];
+      if (chosen && chosen.url) {
+        const vttUrl = chosen.url.startsWith("http") ? chosen.url : `${host}${chosen.url}`;
+        const vttRes = await fetch(vttUrl, { signal: AbortSignal.timeout(5000) });
+        if (vttRes.ok) {
+          const vttText = await vttRes.text();
+          const lines = vttText
+            .split(/\r?\n/)
+            .map((l) => l.replace(/<[^>]+>/g, "").trim())
+            .filter((l) => l && !/^\d+$/.test(l) && !l.includes("-->") && !l.startsWith("WEBVTT") && !isGarbageScriptSegmentText(l));
+          if (lines.length > 0) {
+            const segs = lines.map((text, idx) => {
+              const sec = idx * 5;
+              const mm = String(Math.floor(sec / 60)).padStart(2, "0");
+              const ss = String(sec % 60).padStart(2, "0");
+              return { start: sec, time: `${mm}:${ss}`, duration: 5, text };
+            });
+            return {
+              ok: true,
+              noCaptions: false,
+              source: "browser_invidious_captions",
+              title: "YouTube 영상",
+              channel: "YouTube 채널",
+              language: chosen.language_code || "ko",
+              segments: segs,
+              fullText: segs.map((s) => s.text).join(" ")
+            };
+          }
+        }
+      }
+    } catch (e) {
+      // continue
     }
   }
   return null;
