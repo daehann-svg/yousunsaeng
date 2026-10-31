@@ -1371,6 +1371,10 @@ def build_sanitized_public_db_bytes() -> bytes:
         gh_cfg = dict(sanitized["githubConfig"])
         gh_cfg.pop("password", None)
         sanitized["githubConfig"] = gh_cfg
+    if isinstance(sanitized.get("adminAccount"), dict):
+        adm_cfg = dict(sanitized["adminAccount"])
+        adm_cfg.pop("password", None)
+        sanitized["adminAccount"] = adm_cfg
     return json.dumps(sanitized, ensure_ascii=False, indent=2).encode("utf-8")
 
 
