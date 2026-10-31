@@ -3934,16 +3934,162 @@ document.querySelectorAll('input[name="ai-model"]').forEach((radio) => {
   });
 });
 
+const LOCAL_API_KEYS_STORAGE_KEY = "yousunsaeng_browser_api_keys_v1";
+
+function loadBrowserStoredApiKeys() {
+  try {
+    const raw = localStorage.getItem(LOCAL_API_KEYS_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") return parsed;
+    }
+  } catch (e) {}
+  return {};
+}
+
+function saveBrowserStoredApiKeys(keysObj) {
+  try {
+    localStorage.setItem(LOCAL_API_KEYS_STORAGE_KEY, JSON.stringify(keysObj || {}));
+  } catch (e) {}
+}
+
+function applyAllApiKeysToState({ freeGemini, vscodeGemini4, freeOpenai, githubPat }) {
+  if (!state.modelApiKeys || typeof state.modelApiKeys !== "object") {
+    state.modelApiKeys = {};
+  }
+  if (typeof freeGemini === "string") {
+    state.modelApiKeys["free-gemini"] = freeGemini.trim();
+    if (freeGemini.trim()) state.apiKey = freeGemini.trim();
+  }
+  if (typeof vscodeGemini4 === "string") {
+    state.modelApiKeys["vscode-gemini4"] = vscodeGemini4.trim();
+  }
+  if (typeof freeOpenai === "string") {
+    state.modelApiKeys["free-openai"] = freeOpenai.trim();
+  }
+  if (typeof githubPat === "string" && githubPat.trim()) {
+    setStoredGithubToken(githubPat.trim());
+  }
+  saveBrowserStoredApiKeys({
+    "free-gemini": state.modelApiKeys["free-gemini"] || "",
+    "vscode-gemini4": state.modelApiKeys["vscode-gemini4"] || "",
+    "free-openai": state.modelApiKeys["free-openai"] || "",
+    apiKey: state.apiKey || ""
+  });
+  state.encryptedAdminVault = encryptAdminVault({
+    apiKey: state.apiKey || "",
+    modelApiKeys: state.modelApiKeys || {},
+    githubToken: getStoredGithubToken() || ""
+  });
+  syncAiModelInputsUI();
+  syncGithubConfigUI();
+  saveAppState();
+}
+
+async function verifyAiApiKeyDirectOrServer(model, apiKey) {
+  const cleanKey = (apiKey || "").trim();
+  if (!cleanKey) {
+    return { ok: false, message: "연결 실패: API Key가 비어 있습니다. 키를 입력해주세요." };
+  }
+  const isStaticWebMode = document.body.classList.contains("static-public-mode") && location.port !== "18765";
+  if (!isStaticWebMode) {
+    try {
+      const res = await fetch(TEST_AI_API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(20000),
+        body: JSON.stringify({ model, apiKey: cleanKey })
+      });
+      const data = await res.json();
+      return { ok: Boolean(res.ok && data.ok), message: data.message || (res.ok ? "연결 성공" : "연결 실패") };
+    } catch (e) {
+      // Fallback to direct browser API verification below
+    }
+  }
+
+  // Browser direct AI key verification (works on GitHub Pages without local server)
+  try {
+    if (cleanKey.startsWith("AIza") || cleanKey.startsWith("AQ.")) {
+      const r = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite?key=${encodeURIComponent(cleanKey)}`,
+        { signal: AbortSignal.timeout(12000) }
+      );
+      if (r.ok) {
+        return { ok: true, message: "정상 연결됨: 웹 브라우저에서 Gemini API 키 인증 완료" };
+      }
+      return { ok: false, message: `Gemini API 인증 실패 (HTTP ${r.status}) · 키를 확인해주세요.` };
+    }
+    if (/^(ghp_|github_pat_|ghu_|gho_)/.test(cleanKey)) {
+      const r = await fetch("https://models.inference.ai.azure.com/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${cleanKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "gpt-4o-mini", max_tokens: 5, messages: [{ role: "user", content: "ping" }] }),
+        signal: AbortSignal.timeout(12000)
+      });
+      if (r.ok) return { ok: true, message: "정상 연결됨: 웹 브라우저에서 GitHub Models (GPT-4o mini) 인증 완료" };
+      return { ok: false, message: `GitHub Models 토큰 인증 실패 (HTTP ${r.status})` };
+    }
+    if (cleanKey.startsWith("sk-")) {
+      const r = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${cleanKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "gpt-4o-mini", max_tokens: 5, messages: [{ role: "user", content: "ping" }] }),
+        signal: AbortSignal.timeout(12000)
+      });
+      if (r.ok) return { ok: true, message: "정상 연결됨: 웹 브라우저에서 OpenAI API 키 인증 완료" };
+      return { ok: false, message: `OpenAI API 키 인증 실패 (HTTP ${r.status})` };
+    }
+    return { ok: false, message: "API 키 형식을 확인해주세요 (Gemini: AIza... / OpenAI: sk-...)." };
+  } catch (err) {
+    return { ok: false, message: `네트워크 연결 확인 실패: ${err.message}` };
+  }
+}
+
 function syncAiModelInputsUI() {
+  if (!state.modelApiKeys || typeof state.modelApiKeys !== "object") {
+    state.modelApiKeys = {};
+  }
+  const storedBrowserKeys = loadBrowserStoredApiKeys();
+  ["free-gemini", "vscode-gemini4", "free-openai"].forEach((k) => {
+    if (!state.modelApiKeys[k] && storedBrowserKeys[k]) {
+      state.modelApiKeys[k] = storedBrowserKeys[k];
+    }
+  });
+  if (!state.apiKey && (state.modelApiKeys["free-gemini"] || storedBrowserKeys.apiKey)) {
+    state.apiKey = state.modelApiKeys["free-gemini"] || storedBrowserKeys.apiKey || "";
+  }
+
   document.querySelectorAll('input[name="ai-model"]').forEach((radio) => {
     radio.checked = radio.value === state.selectedAiModel;
     radio.closest(".ai-model-option")?.classList.toggle("active", radio.checked);
   });
   document.querySelectorAll("[data-model-key]").forEach((input) => {
     const model = input.dataset.modelKey;
-    if (!state.modelApiKeys) state.modelApiKeys = {};
-    input.value = state.modelApiKeys[model] || "";
-    input.type = "password";
+    if (document.activeElement !== input) {
+      input.value = state.modelApiKeys[model] || (model !== "free-openai" ? state.apiKey || "" : "");
+    }
+  });
+
+  const fgVal = state.modelApiKeys["free-gemini"] || state.apiKey || "";
+  const vgVal = state.modelApiKeys["vscode-gemini4"] || state.apiKey || "";
+  const oaVal = state.modelApiKeys["free-openai"] || "";
+  const ghVal = getStoredGithubToken();
+
+  const pairs = [
+    ["admin-key-free-gemini", fgVal],
+    ["admin-key-vscode-gemini4", vgVal],
+    ["admin-key-free-openai", oaVal],
+    ["admin-key-github-pat", ghVal],
+    ["modal-key-free-gemini", fgVal],
+    ["modal-key-vscode-gemini4", vgVal],
+    ["modal-key-free-openai", oaVal],
+    ["modal-key-github-pat", ghVal]
+  ];
+  pairs.forEach(([id, val]) => {
+    const el = document.getElementById(id);
+    if (el && document.activeElement !== el) {
+      el.value = val || "";
+    }
   });
 }
 
@@ -3959,11 +4105,172 @@ document.querySelectorAll("[data-model-key]").forEach((input) => {
     }
   });
   input.addEventListener("input", () => {
-    state.modelApiKeys[model] = input.value.trim();
+    const val = input.value.trim();
+    state.modelApiKeys[model] = val;
+    if (model === "free-gemini" && val) state.apiKey = val;
+    saveBrowserStoredApiKeys({
+      ...loadBrowserStoredApiKeys(),
+      [model]: val,
+      apiKey: state.apiKey || ""
+    });
+    state.encryptedAdminVault = encryptAdminVault({
+      apiKey: state.apiKey || "",
+      modelApiKeys: state.modelApiKeys || {},
+      githubToken: getStoredGithubToken() || ""
+    });
     const status = document.querySelector(`[data-conn-status="${model}"]`);
-    status.className = "ai-conn-status";
-    status.textContent = "미확인 · 변경한 키로 연결 확인이 필요합니다.";
+    if (status) {
+      status.className = "ai-conn-status";
+      status.textContent = "키가 입력되었습니다 · [키 저장] 또는 [연결 확인]을 눌러주세요.";
+    }
     saveAppState();
+  });
+});
+
+document.querySelectorAll("[data-toggle-key-vis]").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const model = btn.dataset.toggleKeyVis;
+    const input = document.querySelector(`[data-model-key="${model}"]`);
+    if (!input) return;
+    const isPw = input.type === "password";
+    input.type = isPw ? "text" : "password";
+    btn.textContent = isPw ? "숨김" : "표시";
+  });
+});
+
+document.querySelectorAll("[data-save-model-key]").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const model = btn.dataset.saveModelKey;
+    const input = document.querySelector(`[data-model-key="${model}"]`);
+    const statusEl = document.querySelector(`[data-conn-status="${model}"]`);
+    const val = input?.value.trim() || "";
+    if (!state.modelApiKeys) state.modelApiKeys = {};
+    state.modelApiKeys[model] = val;
+    if (model !== "free-openai" && val) state.apiKey = val;
+    saveBrowserStoredApiKeys({
+      ...loadBrowserStoredApiKeys(),
+      [model]: val,
+      apiKey: state.apiKey || ""
+    });
+    state.encryptedAdminVault = encryptAdminVault({
+      apiKey: state.apiKey || "",
+      modelApiKeys: state.modelApiKeys || {},
+      githubToken: getStoredGithubToken() || ""
+    });
+    syncAiModelInputsUI();
+    saveAppState();
+    if (statusEl) {
+      statusEl.className = val ? "ai-conn-status ok" : "ai-conn-status";
+      statusEl.textContent = val
+        ? `✔ API 키가 저장되었습니다 (${new Date().toLocaleTimeString()}) · 웹 및 로컬 요약에 즉시 사용됩니다.`
+        : "API 키가 비워졌습니다.";
+    }
+    showToast(val ? "AI API 키가 저장되었습니다! 웹과 서버 요약에 즉시 반영됩니다." : "API 키 입력값을 초기화했습니다.");
+  });
+});
+
+document.querySelectorAll("[data-admin-key-toggle]").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const targetId = btn.dataset.adminKeyToggle;
+    const input = document.getElementById(targetId);
+    if (!input) return;
+    const isPw = input.type === "password";
+    input.type = isPw ? "text" : "password";
+    btn.textContent = isPw ? "숨김" : "표시";
+  });
+});
+
+document.getElementById("admin-toggle-all-keys-btn")?.addEventListener("click", () => {
+  const ids = ["admin-key-free-gemini", "admin-key-vscode-gemini4", "admin-key-free-openai", "admin-key-github-pat"];
+  const first = document.getElementById(ids[0]);
+  const nextType = first && first.type === "password" ? "text" : "password";
+  ids.forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.type = nextType;
+    const b = document.querySelector(`[data-admin-key-toggle="${id}"]`);
+    if (b) b.textContent = nextType === "text" ? "숨김" : "표시";
+  });
+});
+
+document.getElementById("admin-api-keys-form")?.addEventListener("submit", (e) => {
+  e.preventDefault();
+  applyAllApiKeysToState({
+    freeGemini: document.getElementById("admin-key-free-gemini")?.value || "",
+    vscodeGemini4: document.getElementById("admin-key-vscode-gemini4")?.value || "",
+    freeOpenai: document.getElementById("admin-key-free-openai")?.value || "",
+    githubPat: document.getElementById("admin-key-github-pat")?.value || ""
+  });
+  const st = document.getElementById("admin-api-key-status-msg");
+  if (st) {
+    st.className = "ai-conn-status ok";
+    st.textContent = `✔ API 키 및 GitHub 토큰이 저장되었습니다 (${new Date().toLocaleTimeString()}) · 웹 및 로컬 요약에 즉시 적용됩니다.`;
+  }
+  showToast("관리자 API 키 설정이 저장되었습니다!");
+});
+
+document.getElementById("modal-api-keys-form")?.addEventListener("submit", (e) => {
+  e.preventDefault();
+  applyAllApiKeysToState({
+    freeGemini: document.getElementById("modal-key-free-gemini")?.value || "",
+    vscodeGemini4: document.getElementById("modal-key-vscode-gemini4")?.value || "",
+    freeOpenai: document.getElementById("modal-key-free-openai")?.value || "",
+    githubPat: document.getElementById("modal-key-github-pat")?.value || ""
+  });
+  const st = document.getElementById("modal-api-key-status");
+  if (st) {
+    st.className = "ai-conn-status ok";
+    st.textContent = `✔ API 키가 저장되었습니다 (${new Date().toLocaleTimeString()}) · 이제 웹에서도 바로 요약을 만들 수 있습니다.`;
+  }
+  showToast("API 키가 등록·수정되었습니다!");
+  setTimeout(() => document.getElementById("api-key-modal")?.close(), 500);
+});
+
+document.querySelectorAll("[data-admin-key-test]").forEach((btn) => {
+  btn.addEventListener("click", async () => {
+    const model = btn.dataset.adminKeyTest;
+    const inputMap = {
+      "free-gemini": "admin-key-free-gemini",
+      "vscode-gemini4": "admin-key-vscode-gemini4",
+      "free-openai": "admin-key-free-openai"
+    };
+    const apiKey = document.getElementById(inputMap[model])?.value.trim() || "";
+    const st = document.getElementById("admin-api-key-status-msg");
+    btn.disabled = true;
+    if (st) {
+      st.className = "ai-conn-status testing";
+      st.textContent = `⟳ [${model}] API 키 연결 및 인증 상태를 확인하고 있습니다...`;
+    }
+    const res = await verifyAiApiKeyDirectOrServer(model, apiKey);
+    btn.disabled = false;
+    if (st) {
+      st.className = res.ok ? "ai-conn-status ok" : "ai-conn-status fail";
+      st.textContent = `${res.ok ? "✔" : "✖"} ${res.message}`;
+    }
+    showToast(res.message);
+  });
+});
+
+document.querySelectorAll("[data-modal-key-test]").forEach((btn) => {
+  btn.addEventListener("click", async () => {
+    const model = btn.dataset.modalKeyTest;
+    const inputMap = {
+      "free-gemini": "modal-key-free-gemini",
+      "free-openai": "modal-key-free-openai"
+    };
+    const apiKey = document.getElementById(inputMap[model])?.value.trim() || "";
+    const st = document.getElementById("modal-api-key-status");
+    btn.disabled = true;
+    if (st) {
+      st.className = "ai-conn-status testing";
+      st.textContent = `⟳ [${model}] API 키 연결 상태를 확인하고 있습니다...`;
+    }
+    const res = await verifyAiApiKeyDirectOrServer(model, apiKey);
+    btn.disabled = false;
+    if (st) {
+      st.className = res.ok ? "ai-conn-status ok" : "ai-conn-status fail";
+      st.textContent = `${res.ok ? "✔" : "✖"} ${res.message}`;
+    }
+    showToast(res.message);
   });
 });
 
@@ -3981,6 +4288,13 @@ document.querySelectorAll("[data-connect-model]").forEach((btn) => {
     const apiKey = keyInput?.value.trim() || "";
     if (!state.modelApiKeys) state.modelApiKeys = {};
     state.modelApiKeys[model] = apiKey;
+    if (model !== "free-openai" && apiKey) state.apiKey = apiKey;
+    saveBrowserStoredApiKeys({
+      ...loadBrowserStoredApiKeys(),
+      [model]: apiKey,
+      apiKey: state.apiKey || ""
+    });
+    syncAiModelInputsUI();
     saveAppState();
 
     if (!statusEl) return;
@@ -3991,31 +4305,15 @@ document.querySelectorAll("[data-connect-model]").forEach((btn) => {
     statusEl.textContent = "⟳ API 서버 연결 및 인증 상태를 확인하고 있습니다...";
 
     try {
-      const res = await fetch(TEST_AI_API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: AbortSignal.timeout(150000),
-        body: JSON.stringify({ model, apiKey })
-      });
-      const data = await res.json();
-      if (res.ok && data.ok) {
+      const result = await verifyAiApiKeyDirectOrServer(model, apiKey);
+      if (result.ok) {
         statusEl.className = "ai-conn-status ok";
-        statusEl.textContent = `✔ ${data.message} · ${new Date().toLocaleTimeString()}`;
-        showToast(data.message);
+        statusEl.textContent = `✔ ${result.message} · ${new Date().toLocaleTimeString()}`;
+        showToast(result.message);
       } else {
         statusEl.className = "ai-conn-status fail";
-        statusEl.textContent = `✖ ${data.message || "연결 실패: API Key를 확인해주세요."}`;
-        showToast(data.message || "API 연결에 실패했습니다.");
-      }
-    } catch (err) {
-      if (!apiKey) {
-        statusEl.className = "ai-conn-status fail";
-        statusEl.textContent = "✖ 연결 실패: API Key가 비어 있습니다. 키를 입력해주세요.";
-        showToast("연결 실패: API Key를 입력해주세요.");
-      } else {
-        statusEl.className = "ai-conn-status fail";
-        statusEl.textContent = "✖ 연결 실패: 로컬 요약 서버 또는 API 엔드포인트에 연결할 수 없습니다.";
-        showToast("연결 실패: API 키 또는 네트워크를 확인해주세요.");
+        statusEl.textContent = `✖ ${result.message}`;
+        showToast(result.message);
       }
     } finally {
       btn.disabled = false;
@@ -7361,12 +7659,16 @@ document.querySelectorAll("[data-open]").forEach((button) => {
       "direct-content-summarize",
       "ratio",
       "vscode-account",
-      "delete-confirm-modal"
+      "delete-confirm-modal",
+      "api-key-modal"
     ]);
     if (adminOnlyModals.has(targetId) && !isAdminLoggedIn()) {
       showToast("관리자 로그인이 필요한 기능입니다.");
       window.location.hash = "admin";
       return;
+    }
+    if (targetId === "api-key-modal") {
+      syncAiModelInputsUI();
     }
     const modal = document.getElementById(targetId);
     if (modal) modal.showModal();
