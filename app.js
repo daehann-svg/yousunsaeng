@@ -2772,6 +2772,45 @@ function bindCategoryDragEvents(container, itemSelector) {
           : Number(e.dataTransfer?.getData("text/plain"));
       reorderCategoryByIndices(fromIdx, targetIdx);
     });
+
+    // Mobile touch drag support via grip handle (.cat-drag-grip)
+    const grip = el.querySelector(".cat-drag-grip");
+    const touchTarget = grip || el;
+    let touchHoverIdx = null;
+    touchTarget.addEventListener(
+      "touchstart",
+      (e) => {
+        if (!grip && e.target.closest("input, button")) return;
+        draggedCategoryIdx = Number(el.dataset.catIdx);
+        touchHoverIdx = null;
+        el.classList.add("cat-dragging");
+      },
+      { passive: true }
+    );
+    touchTarget.addEventListener(
+      "touchmove",
+      (e) => {
+        if (draggedCategoryIdx === null) return;
+        const touch = e.touches?.[0];
+        if (!touch) return;
+        const hovered = document.elementFromPoint(touch.clientX, touch.clientY)?.closest(itemSelector);
+        items.forEach((row) => row.classList.toggle("cat-drag-over", row === hovered));
+        if (hovered && container.contains(hovered)) {
+          touchHoverIdx = Number(hovered.dataset.catIdx);
+        }
+      },
+      { passive: true }
+    );
+    touchTarget.addEventListener("touchend", () => {
+      const fromIdx = draggedCategoryIdx;
+      const toIdx = touchHoverIdx;
+      draggedCategoryIdx = null;
+      touchHoverIdx = null;
+      items.forEach((row) => row.classList.remove("cat-dragging", "cat-drag-over"));
+      if (fromIdx !== null && toIdx !== null && fromIdx !== toIdx) {
+        reorderCategoryByIndices(fromIdx, toIdx);
+      }
+    });
   });
 }
 
