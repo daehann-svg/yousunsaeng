@@ -178,6 +178,238 @@ const GITHUB_UPLOAD_API_URL = `${API_BASE_URL}/api/github/upload`;
 const GITHUB_DEVICE_START_API_URL = `${API_BASE_URL}/api/github/device-start`;
 const GITHUB_DEVICE_POLL_API_URL = `${API_BASE_URL}/api/github/device-poll`;
 const GITHUB_PASSWORD_SESSION_KEY = "yousunsaeng_github_pat";
+const GITHUB_PASSWORD_LOCAL_KEY = "yousunsaeng_github_pat_persistent";
+
+function getStoredGithubToken() {
+  return (
+    sessionStorage.getItem(GITHUB_PASSWORD_SESSION_KEY) ||
+    localStorage.getItem(GITHUB_PASSWORD_LOCAL_KEY) ||
+    ""
+  ).trim();
+}
+
+function setStoredGithubToken(token) {
+  const clean = String(token || "").trim();
+  if (clean) {
+    sessionStorage.setItem(GITHUB_PASSWORD_SESSION_KEY, clean);
+    localStorage.setItem(GITHUB_PASSWORD_LOCAL_KEY, clean);
+  } else {
+    sessionStorage.removeItem(GITHUB_PASSWORD_SESSION_KEY);
+    localStorage.removeItem(GITHUB_PASSWORD_LOCAL_KEY);
+  }
+}
+
+function parseGithubRepoTargetInBrowser(repoPath, fallbackUser = "daehann-svg", defaultBranch = "main", defaultSubpath = "") {
+  const raw = String(repoPath || "").trim();
+  const userClean = String(fallbackUser || "daehann-svg").trim() || "daehann-svg";
+  let branch = String(defaultBranch || "main").trim() || "main";
+  let subpath = String(defaultSubpath || "").trim().replace(/^\/+|\/+$/g, "");
+  if (!raw) return { owner: userClean, repo: "yousunsaeng", branch, subpath };
+  const cleaned = raw.replace(/^https?:\/\/(www\.)?github\.com\//i, "").replace(/\.git$/i, "").replace(/^\/+|\/+$/g, "");
+  const parts = cleaned.split("/").filter(Boolean);
+  if (parts.length >= 2) {
+    const owner = parts[0];
+    const repo = parts[1];
+    if (parts.length >= 4 && (parts[2] === "tree" || parts[2] === "blob")) {
+      branch = parts[3] || branch;
+      if (parts.length > 4 && !subpath) subpath = parts.slice(4).join("/");
+    }
+    return { owner, repo, branch, subpath };
+  }
+  if (parts.length === 1) {
+    return { owner: userClean, repo: parts[0], branch, subpath };
+  }
+  return { owner: userClean, repo: "yousunsaeng", branch, subpath };
+}
+
+function encryptAdminVault(plainObj, adminAcc) {
+  const acc = adminAcc || getAdminAccount();
+  const keyStr = `yousunsaeng-vault-v1:${acc.id}:${acc.passwordHash}`;
+  const encoder = new TextEncoder();
+  const data = encoder.encode(JSON.stringify(plainObj));
+  const key = encoder.encode(keyStr);
+  let hex = "";
+  for (let i = 0; i < data.length; i++) {
+    const k = key[i % key.length] ^ ((i * 31 + 17) & 0xff);
+    hex += (data[i] ^ k).toString(16).padStart(2, "0");
+  }
+  return hex;
+}
+
+function decryptAdminVault(hexStr, adminAcc) {
+  if (!hexStr || typeof hexStr !== "string" || hexStr.length % 2 !== 0) return null;
+  try {
+    const acc = adminAcc || getAdminAccount();
+    const keyStr = `yousunsaeng-vault-v1:${acc.id}:${acc.passwordHash}`;
+    const encoder = new TextEncoder();
+    const key = encoder.encode(keyStr);
+    const out = new Uint8Array(hexStr.length / 2);
+    for (let i = 0; i < out.length; i++) {
+      const b = parseInt(hexStr.slice(i * 2, i * 2 + 2), 16);
+      const k = key[i % key.length] ^ ((i * 31 + 17) & 0xff);
+      out[i] = b ^ k;
+    }
+    const jsonStr = new TextDecoder().decode(out);
+    return JSON.parse(jsonStr);
+  } catch (e) {
+    return null;
+  }
+}
+
+function unlockAdminVaultInBrowser() {
+  if (!isAdminLoggedIn() || !state.encryptedAdminVault) return false;
+  const vault = decryptAdminVault(state.encryptedAdminVault);
+  if (!vault || typeof vault !== "object") return false;
+  let unlocked = false;
+  if (vault.apiKey && !state.apiKey) {
+    state.apiKey = vault.apiKey;
+    unlocked = true;
+  }
+  if (vault.modelApiKeys && typeof vault.modelApiKeys === "object") {
+    if (!state.modelApiKeys || typeof state.modelApiKeys !== "object") {
+      state.modelApiKeys = {};
+    }
+    Object.entries(vault.modelApiKeys).forEach(([k, v]) => {
+      if (v && !state.modelApiKeys[k]) {
+        state.modelApiKeys[k] = v;
+        unlocked = true;
+      }
+    });
+  }
+  if (vault.githubToken && !getStoredGithubToken()) {
+    setStoredGithubToken(vault.githubToken);
+    unlocked = true;
+  }
+  if (unlocked) {
+    syncAiModelInputsUI();
+    syncGithubConfigUI();
+  }
+  return unlocked;
+}
+
+function buildSanitizedPublicStateObject(rawState) {
+  const src = rawState || state;
+  const copy = SummarySync.clone(SummarySync.persistent(src));
+  const ghToken = getStoredGithubToken();
+  const hasSecrets =
+    Boolean(src.apiKey) ||
+    Boolean(ghToken) ||
+    Boolean(src.modelApiKeys && Object.values(src.modelApiKeys).some(Boolean));
+  if (hasSecrets) {
+    copy.encryptedAdminVault = encryptAdminVault({
+      apiKey: src.apiKey || "",
+      modelApiKeys: src.modelApiKeys || {},
+      githubToken: ghToken || ""
+    });
+  } else if (src.encryptedAdminVault) {
+    copy.encryptedAdminVault = src.encryptedAdminVault;
+  }
+  copy.apiKey = "";
+  copy.kakaoJsKey = "";
+  if (copy.modelApiKeys && typeof copy.modelApiKeys === "object") {
+    Object.keys(copy.modelApiKeys).forEach((k) => {
+      copy.modelApiKeys[k] = "";
+    });
+  }
+  if (copy.githubConfig && typeof copy.githubConfig === "object") {
+    delete copy.githubConfig.password;
+  }
+  if (copy.adminAccount && typeof copy.adminAccount === "object") {
+    delete copy.adminAccount.password;
+  }
+  copy._revision = rawState?._revision || state?._revision || 1;
+  return copy;
+}
+
+async function pushWebStateToGithubRepo(stateToSave, customCommitMessage = "") {
+  const token = getStoredGithubToken();
+  if (!token) {
+    return { ok: false, skipped: true, reason: "no_token" };
+  }
+  const cfg = state.githubConfig || {};
+  const target = parseGithubRepoTargetInBrowser(
+    cfg.repoPath || "https://github.com/daehann-svg/yousunsaeng",
+    cfg.username || "daehann-svg",
+    cfg.branch || "main",
+    cfg.subpath || ""
+  );
+  const headers = {
+    Accept: "application/vnd.github+json",
+    Authorization: `Bearer ${token}`,
+    "X-GitHub-Api-Version": "2022-11-28",
+    "Content-Type": "application/json"
+  };
+  const repoApiBase = `https://api.github.com/repos/${encodeURIComponent(target.owner)}/${encodeURIComponent(target.repo)}`;
+  const remoteDbPath = target.subpath ? `${target.subpath}/summaries_db.json` : "summaries_db.json";
+
+  // 1. Get latest commit SHA on branch
+  const refRes = await fetch(`${repoApiBase}/git/ref/heads/${encodeURIComponent(target.branch)}`, { headers, cache: "no-store" });
+  if (!refRes.ok) {
+    throw new Error(`GitHub 브랜치 조회 실패 (HTTP ${refRes.status})`);
+  }
+  const refData = await refRes.json();
+  const latestCommitSha = refData?.object?.sha;
+  if (!latestCommitSha) throw new Error("GitHub 최신 커밋 SHA를 확인하지 못했습니다.");
+
+  // 2. Get base tree SHA
+  const commitRes = await fetch(`${repoApiBase}/git/commits/${latestCommitSha}`, { headers, cache: "no-store" });
+  if (!commitRes.ok) throw new Error(`GitHub 커밋 트리 조회 실패 (HTTP ${commitRes.status})`);
+  const commitData = await commitRes.json();
+  const baseTreeSha = commitData?.tree?.sha;
+
+  // 3. Create UTF-8 blob for summaries_db.json (supports files >1MB up to 100MB via CORS)
+  const sanitizedObj = buildSanitizedPublicStateObject(stateToSave);
+  const jsonContent = JSON.stringify(sanitizedObj, null, 2);
+  const blobRes = await fetch(`${repoApiBase}/git/blobs`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ content: jsonContent, encoding: "utf-8" })
+  });
+  if (!blobRes.ok) throw new Error(`GitHub DB 데이터 업로드 실패 (HTTP ${blobRes.status})`);
+  const blobData = await blobRes.json();
+
+  // 4. Create new tree
+  const treeRes = await fetch(`${repoApiBase}/git/trees`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      base_tree: baseTreeSha,
+      tree: [{ path: remoteDbPath, mode: "100644", type: "blob", sha: blobData.sha }]
+    })
+  });
+  if (!treeRes.ok) throw new Error(`GitHub 트리 생성 실패 (HTTP ${treeRes.status})`);
+  const treeData = await treeRes.json();
+
+  // 5. Create commit & update branch ref
+  const commitMsg = customCommitMessage || `chore: 웹에서 You선생 요약 데이터 저장 (총 ${(sanitizedObj.summaries || []).length}개)`;
+  const newCommitRes = await fetch(`${repoApiBase}/git/commits`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      message: commitMsg,
+      tree: treeData.sha,
+      parents: [latestCommitSha]
+    })
+  });
+  if (!newCommitRes.ok) throw new Error(`GitHub 커밋 생성 실패 (HTTP ${newCommitRes.status})`);
+  const newCommitData = await newCommitRes.json();
+
+  const updateRefRes = await fetch(`${repoApiBase}/git/refs/heads/${encodeURIComponent(target.branch)}`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify({ sha: newCommitData.sha, force: false })
+  });
+  if (!updateRefRes.ok) throw new Error(`GitHub 브랜치 반영 실패 (HTTP ${updateRefRes.status})`);
+
+  return {
+    ok: true,
+    owner: target.owner,
+    repo: target.repo,
+    branch: target.branch,
+    commitSha: String(newCommitData.sha || "").slice(0, 7),
+    pagesUrl: `https://${target.owner}.github.io/${target.repo}/`
+  };
+}
 
 function isGarbageScriptSegmentText(text) {
   const t = String(text || "").trim();
@@ -281,6 +513,151 @@ function askUserForAudioFallback(videoTitle = "YouTube 영상", videoUrl = "") {
   });
 }
 
+async function summarizeYoutubeOrAudioViaBrowserGemini({
+  url,
+  title,
+  channel,
+  ratio,
+  tplObj,
+  customSections,
+  audioBase64 = "",
+  audioMimeType = ""
+}) {
+  const key = (getSelectedModelApiKey() || state.modelApiKeys?.["free-gemini"] || state.apiKey || "").trim();
+  if (!key || (!key.startsWith("AIza") && !key.startsWith("AQ."))) {
+    throw new Error("웹에서 유튜브 영상·오디오 AI 직접 요약을 사용하려면 Gemini API Key가 필요합니다.");
+  }
+  const r = Math.max(10, Math.min(70, Number(ratio) || 30));
+  const isFreeform = Boolean(tplObj.isFreeform) || Number(tplObj.chapterCount) === 0 || String(tplObj.name || "").includes("자유");
+  const baseChapters = Number(tplObj.chapterCount || 11);
+  const baseSubs = Number(tplObj.subsPerChapter || 2);
+  const chapterCount = isFreeform
+    ? 0
+    : customSections && customSections.length
+    ? customSections.length
+    : Math.max(3, Math.min(12, Math.round(baseChapters * (r / 30))));
+  const subsPerChapter = isFreeform ? 0 : r <= 10 ? 1 : r <= 30 ? 2 : Math.min(4, baseSubs + 1);
+  const cleanTitleTheme = String(title || "핵심 주제").split(/\s*[|｜]\s*/)[0].trim();
+  const baseRules = String(tplObj.rules || tplObj.body || "");
+
+  const sysPrompt = `당신은 설교·강연 유튜브 영상을 깊이 있고 충실한 아티클로 요약하는 전문 에디터입니다.
+반드시 아래 JSON 스키마로만 응답하세요:
+{
+  "docTitle": "${cleanTitleTheme}",
+  "chapters": [
+    {
+      "num": "1",
+      "title": "${cleanTitleTheme}",
+      "subs": [
+        {
+          "code": "",
+          "title": "소제목",
+          "body": "구체적인 성경 본문과 배경을 설명하는 첫 문장입니다. 설교자가 든 실제 예화와 핵심 원리를 짚어 주는 두 번째 문장입니다. 삶에서 결단해야 할 방향을 제시하는 세 번째 문장입니다."
+        }
+      ]
+    }
+  ],
+  "keypoints": [
+    "**핵심 소제목 (성경적 상징/핵심 원인)**\\n구체적인 이유와 **핵심 키워드**가 볼드(**) 강조된 1~2문장 설명"
+  ],
+  "transcriptSegments": [
+    { "time": "00:00", "text": "영상의 주요 발언 요약 스크립트" }
+  ]
+}
+- [1] 요약(chapters): ${isFreeform ? "자유형식 지침에 따라" : `대주제 ${chapterCount}개, 각 대주제당 소제목 ${subsPerChapter}~3개로`} 정중체(~합니다) 3문장 문단으로 깊이 있게 작성하세요.
+- [2] 핵심(keypoints): **핵심 소제목 (상징/원인)** + 줄바꿈 + **핵심 키워드** 볼드 강조 설명 구조로 10~16개 작성하세요.
+- transcriptSegments: 영상 흐름에 따른 주요 구간별 발언(10~25개 구간)을 시간과 함께 기록하세요.
+${baseRules}`;
+
+  const mediaPart = audioBase64
+    ? {
+        inlineData: {
+          mimeType: audioMimeType || "audio/mp4",
+          data: audioBase64.includes(",") ? audioBase64.split(",", 2)[1] : audioBase64
+        }
+      }
+    : {
+        fileData: {
+          fileUri: url,
+          mimeType: "video/mp4"
+        }
+      };
+
+  const models = ["gemini-3.5-flash-lite", "gemini-flash-lite-latest", "gemini-2.5-flash", "gemini-3.8-flash"];
+  let lastErr = "";
+  for (const m of models) {
+    try {
+      const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${encodeURIComponent(key)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(240000),
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: sysPrompt }] },
+          contents: [
+            {
+              role: "user",
+              parts: [
+                mediaPart,
+                {
+                  text: `영상 제목: ${title}\n채널명: ${channel}\n요약률: ${r}%\n서식: ${tplObj.name || "기본서식"}\n위 영상을 분석하여 JSON 형식으로 요약본(chapters, keypoints, transcriptSegments)을 작성해 주세요.`
+                }
+              ]
+            }
+          ],
+          generationConfig: { temperature: 0.3, responseMimeType: "application/json" }
+        })
+      });
+      if (!resp.ok) {
+        const errJson = await resp.json().catch(() => ({}));
+        lastErr = errJson?.error?.message || `HTTP ${resp.status}`;
+        continue;
+      }
+      const rJson = await resp.json();
+      const parts = rJson?.candidates?.[0]?.content?.parts || [];
+      const rawText = parts.find((p) => p.text)?.text || "";
+      const match = rawText.match(/\{[\s\S]*\}/);
+      if (!match) continue;
+      const parsed = JSON.parse(match[0]);
+      if (parsed && Array.isArray(parsed.chapters) && parsed.chapters.length) {
+        const segs = Array.isArray(parsed.transcriptSegments) && parsed.transcriptSegments.length
+          ? parsed.transcriptSegments.map((s, idx) => ({
+              start: idx * 15,
+              time: s.time || `${String(Math.floor((idx * 15) / 60)).padStart(2, "0")}:${String((idx * 15) % 60).padStart(2, "0")}`,
+              duration: 15,
+              text: s.text || ""
+            }))
+          : parsed.chapters.flatMap((c, idx) =>
+              (c.subs || []).map((sub, sIdx) => ({
+                start: (idx * 3 + sIdx) * 20,
+                time: `${String(idx * 2 + sIdx).padStart(2, "0")}:00`,
+                duration: 20,
+                text: `${sub.title ? `[${sub.title}] ` : ""}${sub.body || ""}`
+              }))
+            );
+        return {
+          ok: true,
+          engine: `${m} (웹 유튜브 직접 AI 요약)`,
+          title: parsed.docTitle || title,
+          channel,
+          segments: segs,
+          html: renderHanaroChaptersHtml(parsed.chapters, r, tplObj.name, parsed.docTitle || title),
+          takeaways: parsed.keypoints || [],
+          outline: parsed.chapters.map((c) => c.title),
+          excerpt: parsed.chapters[0]?.subs?.[0]?.body?.slice(0, 115) || `${channel}의 ‘${title}’ 웹 AI 요약본입니다.`,
+          quality: {
+            method: "web-youtube-direct-ai",
+            sourceChars: segs.reduce((n, s) => n + (s.text || "").length, 0),
+            notice: "웹 브라우저에서 Gemini AI가 유튜브 영상을 직접 분석하여 생성한 요약본입니다."
+          }
+        };
+      }
+    } catch (e) {
+      lastErr = e.message;
+    }
+  }
+  throw new Error(lastErr || "웹 브라우저 유튜브 AI 직접 요약에 실패했습니다.");
+}
+
 async function runAudioSummarizationViaServer({
   url,
   title,
@@ -300,31 +677,60 @@ async function runAudioSummarizationViaServer({
       ? tplObj.sections
       : null;
 
-  const res = await fetch(SUMMARIZE_AUDIO_API_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    signal: AbortSignal.timeout(600000),
-    body: JSON.stringify({
+  const isStaticWebMode = document.body.classList.contains("static-public-mode") && location.port !== "18765";
+  if (isStaticWebMode) {
+    return await summarizeYoutubeOrAudioViaBrowserGemini({
       url,
       title,
       channel,
       ratio: r,
+      tplObj,
       customSections: effectiveSections,
       audioBase64,
-      audioMimeType,
-      aiModel: state.selectedAiModel,
-      templateType: tplObj.name,
-      apiKey: getSelectedModelApiKey(),
-      algorithmConfig: {
-        isFreeform: Boolean(tplObj.isFreeform) || Number(tplObj.chapterCount) === 0 || String(tplObj.name || "").includes("자유"),
-        chapterCount: tplObj.isFreeform ? 0 : (tplObj.chapterCount ?? 11),
-        subsPerChapter: tplObj.isFreeform ? 0 : (tplObj.subsPerChapter ?? 2),
-        keypointCount: tplObj.isFreeform ? 0 : (tplObj.keypointCount ?? 16),
-        tone: tplObj.tone || "formal",
-        rules: tplObj.rules || tplObj.body || ""
-      }
-    })
-  });
+      audioMimeType
+    });
+  }
+
+  let res;
+  try {
+    res = await fetch(SUMMARIZE_AUDIO_API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(600000),
+      body: JSON.stringify({
+        url,
+        title,
+        channel,
+        ratio: r,
+        customSections: effectiveSections,
+        audioBase64,
+        audioMimeType,
+        aiModel: state.selectedAiModel,
+        templateType: tplObj.name,
+        apiKey: getSelectedModelApiKey(),
+        algorithmConfig: {
+          isFreeform: Boolean(tplObj.isFreeform) || Number(tplObj.chapterCount) === 0 || String(tplObj.name || "").includes("자유"),
+          chapterCount: tplObj.isFreeform ? 0 : (tplObj.chapterCount ?? 11),
+          subsPerChapter: tplObj.isFreeform ? 0 : (tplObj.subsPerChapter ?? 2),
+          keypointCount: tplObj.isFreeform ? 0 : (tplObj.keypointCount ?? 16),
+          tone: tplObj.tone || "formal",
+          rules: tplObj.rules || tplObj.body || ""
+        }
+      })
+    });
+  } catch (networkErr) {
+    if (location.port === "18765") throw networkErr;
+    return await summarizeYoutubeOrAudioViaBrowserGemini({
+      url,
+      title,
+      channel,
+      ratio: r,
+      tplObj,
+      customSections: effectiveSections,
+      audioBase64,
+      audioMimeType
+    });
+  }
   const data = await res.json();
   if (res.ok && data && data.ok && Array.isArray(data.chapters)) {
     return {
@@ -562,6 +968,159 @@ function parseExhaustiveMarkdownInBrowser(segments, title = "전체 항목 요�
   };
 }
 
+async function summarizeDirectlyViaBrowserOpenAIOrGithub(segments, title, channel, ratio, tplObj, customSections, apiKey, extraCommand = "") {
+  const key = (apiKey || getStoredGithubToken() || "").trim();
+  if (!key || !segments || !segments.length) return null;
+  const isGhToken = /^(ghp_|github_pat_|ghu_|gho_)/.test(key);
+  const isOpenAiKey = key.startsWith("sk-") && !key.startsWith("sk-ant-");
+  if (!isGhToken && !isOpenAiKey) return null;
+
+  const r = Math.max(10, Math.min(70, Number(ratio) || 30));
+  const extraClean = String(extraCommand || "").trim();
+  const isFreeform = Boolean(tplObj.isFreeform) || Number(tplObj.chapterCount) === 0 || String(tplObj.name || "").includes("자유") || Boolean(extraClean);
+  const baseChapters = Number(tplObj.chapterCount || 11);
+  const baseSubs = Number(tplObj.subsPerChapter || 2);
+  const chapterCount = isFreeform
+    ? 0
+    : customSections && customSections.length
+    ? customSections.length
+    : Math.max(3, Math.min(14, Math.round(baseChapters * (r / 30))));
+  const subsPerChapter = isFreeform ? 0 : r <= 10 ? 1 : r <= 30 ? 2 : Math.min(4, baseSubs + 1);
+
+  const cleanTitleTheme = String(title || "핵심 주제").split(/\s*[|｜]\s*/)[0].trim();
+  const baseRules = String(tplObj.rules || tplObj.body || "");
+  const customRules = extraClean ? `${baseRules}\n\n[사용자 추가 요약·편집 명령어]\n${extraClean}`.trim() : baseRules;
+  const sysPrompt = `당신은 설교·강연 유튜브 영상과 스크립트를 깊이 있게 요약하는 전문 에디터입니다.
+반드시 아래 JSON 스키마로만 응답하세요:
+{"docTitle":"제목","chapters":[{"num":"1","title":"${cleanTitleTheme}","subs":[{"code":"","title":"소제목","body":"정중체(~합니다) 3문장 요약 본문"}]}],"keypoints":["**핵심 소제목 (상징/원인)**\\n**핵심어**가 볼드 강조된 1~2문장 설명"]}
+${isFreeform ? "자유형식 지침을 최우선으로 따르세요." : `대주제 ${chapterCount}개, 대주제당 소제목 ${subsPerChapter}개로 구성하세요.`}\n${customRules}`;
+
+  const cleanText = segments
+    .map((s) => (s.text || "").trim())
+    .filter((t) => t && !/^\[(음악|박수|웃음)\]$/.test(t))
+    .join(" ")
+    .slice(0, 45000);
+
+  const endpoint = isGhToken
+    ? "https://models.inference.ai.azure.com/chat/completions"
+    : "https://api.openai.com/v1/chat/completions";
+  const modelName = isGhToken ? "gpt-4o" : "gpt-4o-mini";
+
+  try {
+    const resp = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: modelName,
+        temperature: 0.3,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: sysPrompt },
+          { role: "user", content: `영상 제목: ${title}\n채널: ${channel}\n요약률: ${r}%\n\n[스크립트 원문]\n${cleanText}` }
+        ]
+      })
+    });
+    if (!resp.ok) return null;
+    const rJson = await resp.json();
+    const content = rJson?.choices?.[0]?.message?.content || "";
+    const parsed = JSON.parse(content);
+    if (parsed && Array.isArray(parsed.chapters) && parsed.chapters.length) {
+      return {
+        engine: `${modelName} (웹 브라우저 직접 요약)`,
+        html: renderHanaroChaptersHtml(parsed.chapters, r, tplObj.name, parsed.docTitle || title),
+        takeaways: parsed.keypoints || [],
+        outline: parsed.chapters.map((c) => c.title),
+        excerpt: parsed.chapters[0]?.subs?.[0]?.body?.slice(0, 115) || title,
+        quality: {
+          method: "web-browser-ai",
+          sourceChars: cleanText.length,
+          notice: "웹 브라우저에서 AI API로 직접 생성한 요약본입니다."
+        }
+      };
+    }
+  } catch (e) {
+    // fallback to next engine
+  }
+  return null;
+}
+
+async function runWebBrowserSummarizationFallback({
+  segments,
+  title,
+  channel,
+  ratio,
+  tplObj,
+  effectiveSections,
+  extraClean,
+  aiModelLabel,
+  videoUrl
+}) {
+  const apiKey = getSelectedModelApiKey();
+  // 1. Try Browser Direct Gemini API
+  if (apiKey && (apiKey.startsWith("AIza") || apiKey.startsWith("AQ."))) {
+    const geminiRes = await summarizeDirectlyViaBrowserGemini(
+      segments,
+      title,
+      channel,
+      ratio,
+      tplObj,
+      effectiveSections,
+      apiKey,
+      extraClean
+    );
+    if (geminiRes && geminiRes.html) {
+      geminiRes.quality = geminiRes.quality || {
+        method: "web-browser-gemini",
+        sourceChars: segments.reduce((n, s) => n + (s.text || "").length, 0),
+        notice: "웹 브라우저에서 Gemini AI로 직접 생성한 요약본입니다."
+      };
+      return geminiRes;
+    }
+  }
+
+  // 2. Try Browser Direct OpenAI / GitHub Models GPT-4o API
+  const openAiOrGhRes = await summarizeDirectlyViaBrowserOpenAIOrGithub(
+    segments,
+    title,
+    channel,
+    ratio,
+    tplObj,
+    effectiveSections,
+    apiKey,
+    extraClean
+  );
+  if (openAiOrGhRes && openAiOrGhRes.html) {
+    return openAiOrGhRes;
+  }
+
+  // 3. Fallback to Browser Built-in Smart NLP Extractive/Hierarchical Algorithm (works 100% without server or API key)
+  const nlpRes = summarizeTranscriptSegments(
+    segments,
+    title,
+    channel,
+    ratio,
+    tplObj.name || "기본서식",
+    aiModelLabel,
+    effectiveSections,
+    videoUrl
+  );
+  return {
+    engine: "웹 스마트 NLP 요약 엔진",
+    html: nlpRes.html,
+    takeaways: nlpRes.takeaways,
+    outline: nlpRes.outline,
+    excerpt: nlpRes.excerpt,
+    quality: {
+      method: "web-smart-nlp",
+      sourceChars: segments.reduce((n, s) => n + (s.text || "").length, 0),
+      notice: "웹 브라우저 내장 스마트 알고리즘으로 생성한 요약본입니다."
+    }
+  };
+}
+
 async function runSummarizationAlgorithm(segments, title, channel, ratio, templateName, aiModelLabel, customSections, videoUrl = "", extraCommand = "") {
   const r = Number(ratio) || 30;
   const tplObj = findTemplateObject(templateName);
@@ -590,32 +1149,77 @@ async function runSummarizationAlgorithm(segments, title, channel, ratio, templa
     ? `${tplObj.rules || tplObj.body || ""}\n\n[사용자 추가 요약·편집 명령어 (최우선 반영)]\n${extraClean}`.trim()
     : tplObj.rules || tplObj.body || "";
 
-  const res = await fetch(SUMMARIZE_API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: AbortSignal.timeout(1800000),
-        body: JSON.stringify({
-          segments,
-          title,
-          channel,
-          ratio: r,
-          customSections: effectiveSections,
-          templateType: tplObj.name || "기본서식",
-          extraCommand: extraClean,
-          apiKey: getSelectedModelApiKey(),
-          aiModel: state.selectedAiModel || "free-gemini",
-          algorithmConfig: {
-            isFreeform: Boolean(tplObj.isFreeform) || Number(tplObj.chapterCount) === 0 || String(tplObj.name || "").includes("자유") || Boolean(extraClean),
-            chapterCount: tplObj.isFreeform ? 0 : (tplObj.chapterCount ?? 11),
-            subsPerChapter: tplObj.isFreeform ? 0 : (tplObj.subsPerChapter ?? 2),
-            keypointCount: tplObj.isFreeform ? 0 : (tplObj.keypointCount ?? 16),
-            tone: tplObj.tone || "formal",
-            rules: combinedRules
-          }
-        })
-  });
+  const isStaticWebMode = document.body.classList.contains("static-public-mode") && location.port !== "18765";
+  if (isStaticWebMode) {
+    return await runWebBrowserSummarizationFallback({
+      segments,
+      title,
+      channel,
+      ratio: r,
+      tplObj,
+      effectiveSections,
+      extraClean,
+      aiModelLabel,
+      videoUrl
+    });
+  }
+
+  let res;
+  try {
+    res = await fetch(SUMMARIZE_API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: AbortSignal.timeout(1800000),
+          body: JSON.stringify({
+            segments,
+            title,
+            channel,
+            ratio: r,
+            customSections: effectiveSections,
+            templateType: tplObj.name || "기본서식",
+            extraCommand: extraClean,
+            apiKey: getSelectedModelApiKey(),
+            aiModel: state.selectedAiModel || "free-gemini",
+            algorithmConfig: {
+              isFreeform: Boolean(tplObj.isFreeform) || Number(tplObj.chapterCount) === 0 || String(tplObj.name || "").includes("자유") || Boolean(extraClean),
+              chapterCount: tplObj.isFreeform ? 0 : (tplObj.chapterCount ?? 11),
+              subsPerChapter: tplObj.isFreeform ? 0 : (tplObj.subsPerChapter ?? 2),
+              keypointCount: tplObj.isFreeform ? 0 : (tplObj.keypointCount ?? 16),
+              tone: tplObj.tone || "formal",
+              rules: combinedRules
+            }
+          })
+    });
+  } catch (networkErr) {
+    if (location.port === "18765") throw networkErr;
+    // Local server unreachable -> run directly in Web Browser!
+    return await runWebBrowserSummarizationFallback({
+      segments,
+      title,
+      channel,
+      ratio: r,
+      tplObj,
+      effectiveSections,
+      extraClean,
+      aiModelLabel,
+      videoUrl
+    });
+  }
   const data = await res.json();
   if (!res.ok || !data.ok || !Array.isArray(data.chapters) || !data.chapters.length) {
+    if (location.port !== "18765" && (!getSelectedModelApiKey() || String(data.error || "").includes("API Key"))) {
+      return await runWebBrowserSummarizationFallback({
+        segments,
+        title,
+        channel,
+        ratio: r,
+        tplObj,
+        effectiveSections,
+        extraClean,
+        aiModelLabel,
+        videoUrl
+      });
+    }
     throw new Error(data.error || `AI 요약 실패 (${res.status})`);
   }
   return {
@@ -1697,10 +2301,17 @@ function saveLocalState() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch (e) {
-    console.error("Browser cache save failed", e);
-    if (!cacheWarningShown) {
-      showToast("브라우저 임시 저장 공간이 부족합니다. 서버 저장 상태를 확인해 주세요.");
-      cacheWarningShown = true;
+    try {
+      // If localStorage hits 5MB quota, store compact copy in localStorage while full state is kept in IndexedDB
+      const compactState = {
+        ...state,
+        summaries: (state.summaries || []).map((s, idx) =>
+          idx < 10 ? s : { ...s, scriptSegments: [] }
+        )
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(compactState));
+    } catch (innerErr) {
+      console.error("Browser cache save failed", innerErr);
     }
   }
 }
@@ -1744,29 +2355,79 @@ function refreshSummaryLists() {
   renderPublicView();
 }
 
+async function persistWebStandaloneState(submitted) {
+  const nextState = SummarySync.clone(submitted);
+  nextState._revision = (serverBaseline?._revision || nextState._revision || 0) + 1;
+  await PendingStore.put({
+    id: "web_state_backup",
+    kind: "web_state",
+    time: Date.now(),
+    state: SummarySync.persistent(nextState)
+  });
+  applyServerState(nextState, nextState, null);
+  await PendingStore.remove(journalId);
+  refreshSummaryLists();
+
+  const ghToken = getStoredGithubToken();
+  if (ghToken) {
+    setPersistenceStatus("웹 브라우저 저장 완료 · GitHub 클라우드 DB 동기화 중…");
+    try {
+      const ghRes = await pushWebStateToGithubRepo(nextState);
+      if (ghRes.ok) {
+        setPersistenceStatus(`웹 + GitHub 클라우드 저장 완료 · ${nextState.summaries.length}개 (${ghRes.commitSha})`);
+        return;
+      }
+    } catch (ghErr) {
+      console.warn("GitHub cloud sync warning:", ghErr);
+      setPersistenceStatus(`웹 브라우저 저장 완료 · ${nextState.summaries.length}개 (GitHub 동기화 대기)`);
+      return;
+    }
+  }
+  setPersistenceStatus(`웹 브라우저 저장 완료 · ${nextState.summaries.length}개`);
+}
+
 function flushAppState() {
   window.clearTimeout(saveServerTimer);
   const operation = saveQueue.then(async () => {
     if (recoveryBlocked) throw new Error("미저장본 복구 충돌을 먼저 해결해 주세요.");
-    if (!serverBaseline) throw new Error("서버 연결 확인 후 다시 저장해 주세요.");
+    if (!serverBaseline) {
+      serverBaseline = SummarySync.clone(state);
+    }
     const knownKeys = new Set(serverBaseline.summaries.map(SummarySync.key));
     for (const item of state.summaries) {
       if (!item.uid && !knownKeys.has(SummarySync.key(item))) item.uid = crypto.randomUUID();
     }
     await journalPending();
+
+    const isStaticWebMode = document.body.classList.contains("static-public-mode") && location.port !== "18765";
+    if (isStaticWebMode) {
+      const submitted = SummarySync.clone(state);
+      if (SummarySync.equal(SummarySync.persistent(submitted), SummarySync.persistent(serverBaseline))) return;
+      await persistWebStandaloneState(submitted);
+      return;
+    }
+
     for (let attempt = 0; attempt < 4; attempt++) {
       const submitted = SummarySync.clone(state);
       if (SummarySync.equal(SummarySync.persistent(submitted), SummarySync.persistent(serverBaseline))) return;
       setPersistenceStatus("서버에 저장 중…");
-      const res = await fetch(STATE_API_URL, {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({
-          protocol: 2, revision: serverBaseline._revision || 0,
-          state: SummarySync.persistent(submitted)
-        }),
-        signal: AbortSignal.timeout(30000)
-      });
+      let res;
+      try {
+        res = await fetch(STATE_API_URL, {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({
+            protocol: 2, revision: serverBaseline._revision || 0,
+            state: SummarySync.persistent(submitted)
+          }),
+          signal: AbortSignal.timeout(30000)
+        });
+      } catch (networkErr) {
+        if (location.port === "18765") throw networkErr;
+        document.body.classList.add("static-public-mode");
+        await persistWebStandaloneState(submitted);
+        return;
+      }
       const data = await res.json();
       if (res.status === 409 && data.conflict && data.state) {
         const merged = SummarySync.rebase(serverBaseline, submitted, data.state);
@@ -1798,6 +2459,8 @@ function saveAppState() {
   }, 150);
 }
 
+let lastServerSyncTime = 0;
+
 async function syncStateFromServerOnBoot() {
   await syncLatestState(true);
   await restoreBatch();
@@ -1805,6 +2468,17 @@ async function syncStateFromServerOnBoot() {
 
 async function syncLatestState(initial = false) {
   if (syncInFlight || (!initial && batchRunning)) return;
+  if (!initial && document.body.classList.contains("static-public-mode") && location.port !== "18765") {
+    return;
+  }
+  if (
+    !initial &&
+    serverBaseline &&
+    Date.now() - lastServerSyncTime < 10000 &&
+    SummarySync.equal(SummarySync.persistent(state), SummarySync.persistent(serverBaseline))
+  ) {
+    return;
+  }
   initial = initial || !serverBaseline;
   syncInFlight = true;
   const startBtn = document.getElementById("start-summary-btn");
@@ -1818,6 +2492,8 @@ async function syncLatestState(initial = false) {
     if (!res.ok || !data.ok || !Array.isArray(data.state?.summaries)) {
       throw new Error(data.error || "서버 데이터를 읽지 못했습니다.");
     }
+    lastServerSyncTime = Date.now();
+    document.body.classList.remove("static-public-mode");
     if (serverBaseline && (data.state._revision || 0) < (serverBaseline._revision || 0)) return;
     let merged = initial ? data.state : SummarySync.rebase(baselineAtRead, submitted, data.state);
     if (initial) {
@@ -1852,18 +2528,50 @@ async function syncLatestState(initial = false) {
     }
     setPersistenceStatus(`최신 데이터 확인 · ${state.summaries.length}개`);
   } catch (error) {
-    if (initial && location.hostname !== "127.0.0.1" && location.hostname !== "localhost") {
+    if (location.port !== "18765") {
       try {
-        const res = await fetch("./summaries_db.json", {cache: "no-store"});
-        if (!res.ok) throw new Error(`공개 데이터 읽기 오류 (${res.status})`);
-        const data = await res.json();
-        if (!Array.isArray(data.summaries)) throw new Error("공개 데이터 형식 오류");
-        applyServerState(data, data, null);
-        serverBaseline = null;
+        let data = null;
+        try {
+          const res = await fetch("./summaries_db.json", {cache: "no-store"});
+          if (res.ok) data = await res.json();
+        } catch (fetchErr) {
+          // ignore and use local state
+        }
+        if (!data || !Array.isArray(data.summaries)) {
+          data = SummarySync.clone(state);
+        }
+        // Merge any summaries saved in browser IndexedDB web_state_backup on top of summaries_db.json
+        const allRecords = await PendingStore.all().catch(() => []);
+        const webBackup = allRecords.find((r) => r.id === "web_state_backup" && r.state && Array.isArray(r.state.summaries));
+        let mergedWebState = data;
+        if (webBackup) {
+          try {
+            if ((webBackup.state._revision || 0) >= (data._revision || 0)) {
+              mergedWebState = SummarySync.rebase(data, webBackup.state, data);
+              mergedWebState._revision = Math.max(webBackup.state._revision || 0, data._revision || 0);
+            }
+          } catch (mergeErr) {
+            mergedWebState = webBackup.state;
+          }
+        }
+        applyServerState(mergedWebState, mergedWebState, null);
         document.body.classList.add("static-public-mode");
+        syncAiModelInputsUI();
+        syncDefaultRatioUI(false);
+        syncGithubConfigUI();
         syncAdminAuthUI();
+        renderAccountsUI();
+        renderTemplatesUI();
         refreshSummaryLists();
-        setPersistenceStatus("You선생 공개 웹페이지");
+        if (initial) {
+          renderSummaryDetail(state.currentSummaryId);
+        }
+        const hasGhToken = Boolean(getStoredGithubToken());
+        setPersistenceStatus(
+          hasGhToken
+            ? `웹 단독 모드 (GitHub 클라우드 자동저장 활성) · ${state.summaries.length}개`
+            : `웹 단독 모드 (브라우저 즉시 저장 활성) · ${state.summaries.length}개`
+        );
         if (!isAdminLoggedIn() && (!window.location.hash || (!window.location.hash.startsWith("#view") && !window.location.hash.startsWith("#admin")))) {
           window.location.hash = "view";
         } else {
@@ -2402,49 +3110,130 @@ function getTemplateOptionsHtml(selectedVal = "") {
     .join("");
 }
 
+async function fetchYoutubeTranscriptInBrowser(url) {
+  const vid = extractYoutubeVideoId(url);
+  if (!vid) return null;
+
+  // 1. Reuse cached transcript from existing summaries in state if same videoId exists
+  const existing = (state.summaries || []).find(
+    (s) => extractYoutubeVideoId(s.url) === vid && Array.isArray(s.scriptSegments) && s.scriptSegments.length > 0
+  );
+  if (existing) {
+    const validSegs = existing.scriptSegments.filter((s) => !isGarbageScriptSegmentText(s.text));
+    if (validSegs.length > 0) {
+      return {
+        ok: true,
+        noCaptions: false,
+        source: "cached_summary_segments",
+        title: existing.title || "YouTube 영상",
+        channel: existing.channel || "YouTube 채널",
+        language: "ko",
+        segments: validSegs,
+        fullText: validSegs.map((s) => s.text).join(" ")
+      };
+    }
+  }
+
+  // 2. Try CORS-enabled Piped stream APIs to fetch subtitles directly in browser
+  const pipedHosts = [
+    "https://pipedapi.kavin.rocks",
+    "https://pipedapi.tokhmi.xyz",
+    "https://pipedapi.moomoo.me"
+  ];
+  for (const host of pipedHosts) {
+    try {
+      const pRes = await fetch(`${host}/streams/${encodeURIComponent(vid)}`, {
+        signal: AbortSignal.timeout(5000)
+      });
+      if (!pRes.ok) continue;
+      const pData = await pRes.json();
+      const subs = Array.isArray(pData.subtitles) ? pData.subtitles : [];
+      const chosen =
+        subs.find((s) => /^ko/i.test(s.code || "")) ||
+        subs.find((s) => /^en/i.test(s.code || "")) ||
+        subs[0];
+      if (chosen && chosen.url) {
+        const subRes = await fetch(chosen.url, { signal: AbortSignal.timeout(5000) });
+        if (subRes.ok) {
+          const subText = await subRes.text();
+          const lines = subText
+            .split(/\r?\n/)
+            .map((l) => l.replace(/<[^>]+>/g, "").trim())
+            .filter((l) => l && !/^\d+$/.test(l) && !l.includes("-->") && !l.startsWith("WEBVTT") && !isGarbageScriptSegmentText(l));
+          if (lines.length > 0) {
+            const segs = lines.map((text, idx) => {
+              const sec = idx * 5;
+              const mm = String(Math.floor(sec / 60)).padStart(2, "0");
+              const ss = String(sec % 60).padStart(2, "0");
+              return { start: sec, time: `${mm}:${ss}`, duration: 5, text };
+            });
+            return {
+              ok: true,
+              noCaptions: false,
+              source: "browser_piped_captions",
+              title: pData.title || "YouTube 영상",
+              channel: pData.uploader || "YouTube 채널",
+              language: chosen.code || "ko",
+              segments: segs,
+              fullText: segs.map((s) => s.text).join(" ")
+            };
+          }
+        }
+      }
+    } catch (e) {
+      // continue to next host
+    }
+  }
+  return null;
+}
+
 async function fetchYoutubeTranscriptData(url, manualScript = "") {
   const cleanUrl = (url || "").trim();
   const cleanScript = (manualScript || "").trim();
 
-  // 1. Try local Python transcript server (youtube-transcript-api + yt-dlp)
-  try {
-    const res = await fetch(TRANSCRIPT_API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url: cleanUrl, script: cleanScript })
-    });
-    const data = await res.json().catch(() => null);
-    if (data) {
-      const validSegments = Array.isArray(data.segments)
-        ? data.segments.filter((s) => !isGarbageScriptSegmentText(s.text))
-        : [];
-      if (validSegments.length > 0) {
-        return {
-          ok: true,
-          noCaptions: false,
-          source: data.source || "youtube_transcript_api",
-          title: data.title || "YouTube 영상",
-          channel: data.channel || "YouTube 채널",
-          language: data.language || "ko",
-          segments: validSegments,
-          fullText: validSegments.map((s) => s.text).join(" ")
-        };
+  // 1. Try local Python transcript server (youtube-transcript-api + yt-dlp) if not in static web mode
+  const isStaticWebMode = document.body.classList.contains("static-public-mode") && location.port !== "18765";
+  if (!isStaticWebMode) {
+    try {
+      const res = await fetch(TRANSCRIPT_API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(12000),
+        body: JSON.stringify({ url: cleanUrl, script: cleanScript })
+      });
+      const data = await res.json().catch(() => null);
+      if (data) {
+        const validSegments = Array.isArray(data.segments)
+          ? data.segments.filter((s) => !isGarbageScriptSegmentText(s.text))
+          : [];
+        if (validSegments.length > 0) {
+          return {
+            ok: true,
+            noCaptions: false,
+            source: data.source || "youtube_transcript_api",
+            title: data.title || "YouTube 영상",
+            channel: data.channel || "YouTube 채널",
+            language: data.language || "ko",
+            segments: validSegments,
+            fullText: validSegments.map((s) => s.text).join(" ")
+          };
+        }
+        if (data.noCaptions && !cleanScript) {
+          return {
+            ok: false,
+            noCaptions: true,
+            source: "no_captions",
+            title: data.title || "YouTube 영상",
+            channel: data.channel || "YouTube 채널",
+            language: "ko",
+            segments: [],
+            fullText: ""
+          };
+        }
       }
-      if (data.noCaptions) {
-        return {
-          ok: false,
-          noCaptions: true,
-          source: "no_captions",
-          title: data.title || "YouTube 영상",
-          channel: data.channel || "YouTube 채널",
-          language: "ko",
-          segments: [],
-          fullText: ""
-        };
-      }
+    } catch (e) {
+      // Server unreachable or blocked -> fallback to browser extraction
     }
-  } catch (e) {
-    // Server unreachable or blocked
   }
 
   // 2. If user typed or pasted script directly in browser
@@ -2463,7 +3252,13 @@ async function fetchYoutubeTranscriptData(url, manualScript = "") {
     };
   }
 
-  // 3. No captions detected
+  // 3. Try browser-side YouTube caption extraction (cached segments / Piped CORS API)
+  const browserTr = await fetchYoutubeTranscriptInBrowser(cleanUrl);
+  if (browserTr && browserTr.segments && browserTr.segments.length > 0) {
+    return browserTr;
+  }
+
+  // 4. No captions detected
   return {
     ok: false,
     noCaptions: true,
@@ -3553,8 +4348,16 @@ document.getElementById("start-summary-btn")?.addEventListener("click", async ()
     let summarized = null;
 
     if (trData.noCaptions || segCount === 0) {
-      statusEl.textContent = `자막이 없는 영상입니다 · 오디오 파일 AI 분석 진행 여부 확인 중...`;
-      const audioChoice = await askUserForAudioFallback(trData.title, entry.url);
+      const isStaticWebMode = document.body.classList.contains("static-public-mode") && location.port !== "18765";
+      const hasGeminiKey = Boolean((getSelectedModelApiKey() || state.modelApiKeys?.["free-gemini"] || state.apiKey || "").trim());
+      let audioChoice;
+      if (isStaticWebMode && entry.url && hasGeminiKey) {
+        // On Web Mode (GitHub Pages), automatically analyze the YouTube URL directly via Gemini API without modal interruption
+        audioChoice = { useAudio: true, audioBase64: "", audioMimeType: "" };
+      } else {
+        statusEl.textContent = `자막이 없는 영상입니다 · 오디오 파일 AI 분석 진행 여부 확인 중...`;
+        audioChoice = await askUserForAudioFallback(trData.title, entry.url);
+      }
       if (!audioChoice.useAudio) throw new Error("원문 없음 · 이 영상을 건너뛰었습니다. 원고 또는 오디오를 제공한 뒤 재시도해 주세요.");
       completedSteps++;
       updateOverall();
@@ -4172,10 +4975,12 @@ document.getElementById("library-per-page-select")?.addEventListener("change", (
 function renderVideoEmbedPlayer(item, startSeconds = 0) {
   const box = document.getElementById("detail-video-embed-box");
   if (!box) return;
+  const summaryPage = document.getElementById("summary");
+  const isSummaryVisible = Boolean(summaryPage && !summaryPage.hidden);
   const vid = extractYoutubeVideoId(item.url);
-  if (vid) {
+  if (vid && (isSummaryVisible || startSeconds > 0)) {
     const autoPlayParam = startSeconds > 0 ? `&start=${Math.floor(startSeconds)}&autoplay=1` : "";
-    box.innerHTML = `<iframe src="https://www.youtube.com/embed/${escapeHtml(vid)}?rel=0${autoPlayParam}" title="${escapeHtml(item.title)}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
+    box.innerHTML = `<iframe loading="lazy" src="https://www.youtube.com/embed/${escapeHtml(vid)}?rel=0${autoPlayParam}" title="${escapeHtml(item.title)}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
   } else {
     box.innerHTML = `<div class="video-preview"><span id="detail-preview-title">${escapeHtml(item.title.slice(0, 18))}</span>${iconSvg("play")}<small id="detail-preview-channel">${escapeHtml(item.channel)}</small></div>`;
   }
@@ -5806,7 +6611,7 @@ function syncGithubConfigUI() {
   if (subIn && document.activeElement !== subIn) subIn.value = cfg.subpath || "";
   if (dbCheck) dbCheck.checked = cfg.includeDb !== false;
   if (passIn && !passIn.value) {
-    passIn.value = sessionStorage.getItem(GITHUB_PASSWORD_SESSION_KEY) || "";
+    passIn.value = getStoredGithubToken();
   }
 }
 
@@ -5826,9 +6631,9 @@ function readGithubFormValues() {
   cfg.subpath = subpath;
   cfg.includeDb = includeDb;
   if (password) {
-    sessionStorage.setItem(GITHUB_PASSWORD_SESSION_KEY, password);
+    setStoredGithubToken(password);
   } else {
-    sessionStorage.removeItem(GITHUB_PASSWORD_SESSION_KEY);
+    setStoredGithubToken("");
   }
   return { username, password, repoPath, branch, subpath, includeDb, commitMessage };
 }
@@ -5846,6 +6651,65 @@ function updateGithubCheckCardUI(key, ok, message) {
   }
 }
 
+async function runBrowserDirectGithubCheck(vals) {
+  const target = parseGithubRepoTargetInBrowser(vals.repoPath, vals.username, vals.branch, vals.subpath);
+  updateGithubCheckCardUI("local_server", true, `웹 브라우저 단독 실행 모드 (IndexedDB + GitHub 클라우드 저장 활성 · 요약 ${state.summaries.length}개)`);
+
+  const headers = {
+    Accept: "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28"
+  };
+  if (vals.password) headers.Authorization = `Bearer ${vals.password}`;
+
+  let webOk = false;
+  let authOk = false;
+  let repoOk = false;
+  try {
+    const rRate = await fetch("https://api.github.com/rate_limit", { headers });
+    webOk = rRate.ok;
+    updateGithubCheckCardUI("github_web", webOk, webOk ? "깃허브 API 서버(api.github.com) 브라우저 직접 통신 원활" : `깃허브 API 응답 오류 (${rRate.status})`);
+  } catch (e) {
+    updateGithubCheckCardUI("github_web", false, `깃허브 API 연결 실패: ${e.message}`);
+  }
+
+  if (!vals.password) {
+    updateGithubCheckCardUI("github_auth", false, "패스워드(Personal Access Token)를 입력하면 GitHub 클라우드 자동 저장이 활성화됩니다.");
+  } else {
+    try {
+      const rUser = await fetch("https://api.github.com/user", { headers });
+      if (rUser.ok) {
+        const uJson = await rUser.json();
+        authOk = true;
+        updateGithubCheckCardUI("github_auth", true, `브라우저 직접 인증 성공: @${uJson.login}`);
+      } else {
+        updateGithubCheckCardUI("github_auth", false, `인증 실패 (HTTP ${rUser.status}) · 유효한 GitHub 토큰(ghp_ / gho_ / github_pat_)을 입력해 주세요.`);
+      }
+    } catch (e) {
+      updateGithubCheckCardUI("github_auth", false, `인증 확인 오류: ${e.message}`);
+    }
+  }
+
+  try {
+    const rRepo = await fetch(`https://api.github.com/repos/${encodeURIComponent(target.owner)}/${encodeURIComponent(target.repo)}`, { headers });
+    if (rRepo.ok) {
+      const repoJson = await rRepo.json();
+      const canPush = vals.password ? Boolean(repoJson.permissions?.push || repoJson.permissions?.admin) : false;
+      repoOk = vals.password ? canPush : true;
+      updateGithubCheckCardUI(
+        "github_repo",
+        repoOk,
+        `저장소 확인됨: ${target.owner}/${target.repo} (${vals.password ? (canPush ? "웹 직접 저장 가능" : "쓰기 권한 확인 필요") : "공개 읽기 가능"})`
+      );
+    } else {
+      updateGithubCheckCardUI("github_repo", false, `저장소 조회 실패 (${target.owner}/${target.repo} · HTTP ${rRepo.status})`);
+    }
+  } catch (e) {
+    updateGithubCheckCardUI("github_repo", false, `저장소 조회 오류: ${e.message}`);
+  }
+
+  return { allPassed: webOk && authOk && repoOk, webAndServerOk: webOk };
+}
+
 async function runGithubConnectivityCheck() {
   const vals = readGithubFormValues();
   saveAppState();
@@ -5857,10 +6721,23 @@ async function runGithubConnectivityCheck() {
   if (btn2) btn2.disabled = true;
   if (summaryBadge) {
     summaryBadge.className = "tag tag-amber";
-    summaryBadge.textContent = "깃허브 웹 · 로컬 서버 통신 상태를 점검하고 있습니다...";
+    summaryBadge.textContent = "깃허브 웹 · 서버 통신 상태를 점검하고 있습니다...";
   }
 
   try {
+    const isStaticWebMode = document.body.classList.contains("static-public-mode") && location.port !== "18765";
+    if (isStaticWebMode) {
+      const { allPassed, webAndServerOk } = await runBrowserDirectGithubCheck(vals);
+      if (summaryBadge) {
+        summaryBadge.className = allPassed ? "tag tag-sage" : webAndServerOk ? "tag tag-amber" : "tag tag-purple";
+        summaryBadge.textContent = allPassed
+          ? `✔ 웹 브라우저 ↔ GitHub 클라우드 직접 통신 정상 (${new Date().toLocaleTimeString()})`
+          : `⚠ 웹 브라우저 연결은 정상이나 GitHub 토큰 확인이 필요합니다 (${new Date().toLocaleTimeString()})`;
+      }
+      showToast(allPassed ? "웹 브라우저와 GitHub 클라우드 통신이 원활합니다." : "통신 점검이 완료되었습니다.");
+      return;
+    }
+
     const res = await fetch(GITHUB_CHECK_API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -5892,12 +6769,13 @@ async function runGithubConnectivityCheck() {
     }
     showToast(allPassed ? "깃허브 웹 및 로컬 서버 통신이 모두 원활합니다." : "통신 점검이 완료되었습니다. 세부 항목을 확인해 주세요.");
   } catch (error) {
-    updateGithubCheckCardUI("local_server", false, `로컬 서버 통신 실패: ${error.message}`);
+    const { allPassed } = await runBrowserDirectGithubCheck(vals);
     if (summaryBadge) {
-      summaryBadge.className = "tag tag-purple";
-      summaryBadge.textContent = `✖ 점검 실패: ${error.message}`;
+      summaryBadge.className = allPassed ? "tag tag-sage" : "tag tag-amber";
+      summaryBadge.textContent = allPassed
+        ? `✔ 웹 브라우저 직접 통신 정상 (${new Date().toLocaleTimeString()})`
+        : `⚠ 로컬 서버 오프라인 · 웹 브라우저 단독 모드로 동작합니다`;
     }
-    showToast(`통신 점검 실패: ${error.message}`);
   } finally {
     if (btn1) btn1.disabled = false;
     if (btn2) btn2.disabled = false;
@@ -5927,12 +6805,28 @@ async function runGithubAutoUpload() {
 
   if (uploadBtn) uploadBtn.disabled = true;
   if (progBox) progBox.hidden = false;
-  if (titleEl) titleEl.textContent = "깃허브 저장소 인증 및 You선생 소스 파일 업로드 중...";
+  if (titleEl) titleEl.textContent = "깃허브 저장소 인증 및 You선생 데이터 업로드 중...";
   if (pctEl) pctEl.textContent = "35%";
   if (barEl) barEl.style.width = "35%";
-  if (logEl) logEl.innerHTML = `<div>• 대상 경로: <strong>${escapeHtml(vals.repoPath)}</strong> (${escapeHtml(vals.branch)})</div><div>• 소스 패키징 및 GitHub API 전송 중...</div>`;
+  if (logEl) logEl.innerHTML = `<div>• 대상 경로: <strong>${escapeHtml(vals.repoPath)}</strong> (${escapeHtml(vals.branch)})</div><div>• 데이터 패키징 및 GitHub API 전송 중...</div>`;
 
   try {
+    const isStaticWebMode = document.body.classList.contains("static-public-mode") && location.port !== "18765";
+    if (isStaticWebMode) {
+      const ghRes = await pushWebStateToGithubRepo(state, vals.commitMessage);
+      if (titleEl) titleEl.textContent = `✔ 웹 브라우저에서 GitHub 클라우드 DB(summaries_db.json) 직접 업로드 완료!`;
+      if (pctEl) pctEl.textContent = "100%";
+      if (barEl) barEl.style.width = "100%";
+      if (logEl) {
+        logEl.innerHTML = `
+          <div>✔ <code>summaries_db.json</code> (총 ${state.summaries.length}개 요약본 · 커밋 <code>${escapeHtml(ghRes.commitSha)}</code>)</div>
+          <div style="margin-top:8px"><a href="${escapeHtml(ghRes.pagesUrl)}" target="_blank" rel="noopener noreferrer" style="color:#1d4ed8;font-weight:700;text-decoration:underline">🌐 You선생 공개 웹페이지 열기 (${escapeHtml(ghRes.pagesUrl)})</a></div>
+        `;
+      }
+      showToast("웹 브라우저에서 GitHub 저장소에 요약 데이터를 성공적으로 저장했습니다!");
+      return;
+    }
+
     const res = await fetch(GITHUB_UPLOAD_API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -5975,6 +6869,24 @@ async function runGithubAutoUpload() {
     showToast(data.message);
     await runGithubConnectivityCheck();
   } catch (error) {
+    try {
+      const ghRes = await pushWebStateToGithubRepo(state, vals.commitMessage);
+      if (ghRes && ghRes.ok) {
+        if (titleEl) titleEl.textContent = `✔ 웹 브라우저에서 GitHub 클라우드 DB(summaries_db.json) 직접 업로드 완료!`;
+        if (pctEl) pctEl.textContent = "100%";
+        if (barEl) barEl.style.width = "100%";
+        if (logEl) {
+          logEl.innerHTML = `
+            <div>✔ <code>summaries_db.json</code> (총 ${state.summaries.length}개 요약본 · 커밋 <code>${escapeHtml(ghRes.commitSha)}</code>)</div>
+            <div style="margin-top:8px"><a href="${escapeHtml(ghRes.pagesUrl)}" target="_blank" rel="noopener noreferrer" style="color:#1d4ed8;font-weight:700;text-decoration:underline">🌐 You선생 공개 웹페이지 열기 (${escapeHtml(ghRes.pagesUrl)})</a></div>
+          `;
+        }
+        showToast("웹 브라우저에서 GitHub 저장소에 요약 데이터를 성공적으로 저장했습니다!");
+        return;
+      }
+    } catch (ghFallbackErr) {
+      // use original error below
+    }
     if (titleEl) titleEl.textContent = `업로드 오류: ${error.message}`;
     if (pctEl) pctEl.textContent = "오류";
     if (logEl) logEl.innerHTML = `<div style="color:#b42318">✖ 서버 통신 오류: ${escapeHtml(error.message)}</div>`;
@@ -6026,7 +6938,7 @@ async function startGithubDeviceLogin(autoUploadAfterAuth = false) {
           window.clearInterval(ghDevicePollTimer);
           const passIn = document.getElementById("gh-password-input");
           if (passIn) passIn.value = pData.accessToken;
-          sessionStorage.setItem(GITHUB_PASSWORD_SESSION_KEY, pData.accessToken);
+          setStoredGithubToken(pData.accessToken);
           if (pData.login) {
             const userIn = document.getElementById("gh-username-input");
             const repoIn = document.getElementById("gh-repo-path-input");
@@ -6157,6 +7069,7 @@ function syncAdminAuthUI() {
   }
 
   if (loggedIn) {
+    unlockAdminVaultInBrowser();
     const currentIdBadge = document.getElementById("admin-current-id-badge");
     if (currentIdBadge) currentIdBadge.textContent = acc.id;
     const loginTimeText = document.getElementById("admin-login-time-text");
@@ -6291,6 +7204,14 @@ document.getElementById("admin-credentials-form")?.addEventListener("submit", (e
     updatedAt: new Date().toISOString()
   };
   state.adminAccount = nextAccount;
+  state.encryptedAdminVault = encryptAdminVault(
+    {
+      apiKey: state.apiKey || "",
+      modelApiKeys: state.modelApiKeys || {},
+      githubToken: getStoredGithubToken() || ""
+    },
+    nextAccount
+  );
 
   const sessionPayload = JSON.stringify({
     id: nextAccount.id,
@@ -6395,6 +7316,19 @@ window.addEventListener("hashchange", showPage);
 document.querySelectorAll("[data-open]").forEach((button) => {
   button.addEventListener("click", () => {
     const targetId = button.dataset.open;
+    const adminOnlyModals = new Set([
+      "categories",
+      "template-add",
+      "direct-content-summarize",
+      "ratio",
+      "vscode-account",
+      "delete-confirm-modal"
+    ]);
+    if (adminOnlyModals.has(targetId) && !isAdminLoggedIn()) {
+      showToast("관리자 로그인이 필요한 기능입니다.");
+      window.location.hash = "admin";
+      return;
+    }
     const modal = document.getElementById(targetId);
     if (modal) modal.showModal();
   });
