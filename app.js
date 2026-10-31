@@ -1848,7 +1848,6 @@ async function syncLatestState(initial = false) {
     if (initial) renderSummaryDetail(state.currentSummaryId);
     setPersistenceStatus(`최신 데이터 확인 · ${state.summaries.length}개`);
   } catch (error) {
-    reportSaveError(error);
     if (initial && location.hostname !== "127.0.0.1" && location.hostname !== "localhost") {
       try {
         const res = await fetch("./summaries_db.json", {cache: "no-store"});
@@ -1857,11 +1856,19 @@ async function syncLatestState(initial = false) {
         if (!Array.isArray(data.summaries)) throw new Error("공개 데이터 형식 오류");
         applyServerState(data, data, null);
         serverBaseline = null;
+        document.body.classList.add("static-public-mode");
         refreshSummaryLists();
-        setPersistenceStatus("정적 공개본 · 읽기 전용");
+        setPersistenceStatus("You선생 공개 웹페이지");
+        if (!window.location.hash || !window.location.hash.startsWith("#view")) {
+          window.location.hash = "view";
+        } else {
+          showPage();
+        }
       } catch (fallbackError) {
         reportSaveError(fallbackError);
       }
+    } else {
+      reportSaveError(error);
     }
   } finally {
     syncInFlight = false;
@@ -1992,15 +1999,78 @@ function getCategoryNumberedLabel(catName, fallbackIdx = null) {
   return num ? `${num}. ${cleanName}` : cleanName;
 }
 
+let draggedCategoryIdx = null;
+
+function reorderCategoryByIndices(fromIdx, toIdx) {
+  if (
+    fromIdx === null ||
+    toIdx === null ||
+    fromIdx === toIdx ||
+    fromIdx < 0 ||
+    toIdx < 0 ||
+    fromIdx >= state.categories.length ||
+    toIdx >= state.categories.length
+  ) {
+    return false;
+  }
+  const [moved] = state.categories.splice(fromIdx, 1);
+  state.categories.splice(toIdx, 0, moved);
+  saveAppState();
+  renderCategoriesUI();
+  renderResultsLibrary();
+  renderPublicView();
+  renderSummaryDetail(state.currentSummaryId);
+  reconcileBatchResults();
+  showToast(`‘${getCategoryNumberedLabel(moved.name)}’ 분류 순서가 변경되었습니다.`);
+  return true;
+}
+
+function bindCategoryDragEvents(container, itemSelector) {
+  if (!container) return;
+  const items = [...container.querySelectorAll(itemSelector)];
+  items.forEach((el) => {
+    el.addEventListener("dragstart", (e) => {
+      draggedCategoryIdx = Number(el.dataset.catIdx);
+      el.classList.add("cat-dragging");
+      if (e.dataTransfer) {
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", String(draggedCategoryIdx));
+      }
+    });
+    el.addEventListener("dragend", () => {
+      draggedCategoryIdx = null;
+      items.forEach((row) => row.classList.remove("cat-dragging", "cat-drag-over"));
+    });
+    el.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+      items.forEach((row) => row.classList.toggle("cat-drag-over", row === el));
+    });
+    el.addEventListener("dragleave", () => {
+      el.classList.remove("cat-drag-over");
+    });
+    el.addEventListener("drop", (e) => {
+      e.preventDefault();
+      el.classList.remove("cat-drag-over");
+      const targetIdx = Number(el.dataset.catIdx);
+      const fromIdx =
+        draggedCategoryIdx !== null
+          ? draggedCategoryIdx
+          : Number(e.dataTransfer?.getData("text/plain"));
+      reorderCategoryByIndices(fromIdx, targetIdx);
+    });
+  });
+}
+
 function renderCategoriesUI() {
-  // Sidebar nav (show categories with numbering prefix and active highlight)
+  // Sidebar nav (show categories with numbering prefix, active highlight, and drag-to-reorder)
   const sidebarNav = document.querySelector(".category-nav");
   if (sidebarNav) {
     sidebarNav.innerHTML = state.categories
       .map(
         (cat, idx) => `
-        <a href="#results" class="${state.activeCategoryFilter === cat.name ? "active" : ""}" data-sidebar-cat="${escapeHtml(cat.name)}">
-          <span class="dot ${escapeHtml(cat.color || "sage")}"></span><strong class="cat-num">${idx + 1}.</strong> ${escapeHtml(cat.name)}<span>${getCategoryCount(cat.name)}</span>
+        <a href="#results" draggable="true" data-cat-idx="${idx}" title="드래그하여 분류 순서 변경" class="${state.activeCategoryFilter === cat.name ? "active" : ""}" data-sidebar-cat="${escapeHtml(cat.name)}">
+          <span class="cat-drag-grip" aria-hidden="true">⋮⋮</span><span class="dot ${escapeHtml(cat.color || "sage")}"></span><strong class="cat-num">${idx + 1}.</strong> ${escapeHtml(cat.name)}<span>${getCategoryCount(cat.name)}</span>
         </a>
       `
       )
@@ -2014,9 +2084,10 @@ function renderCategoriesUI() {
         renderResultsLibrary();
       });
     });
+    bindCategoryDragEvents(sidebarNav, "[data-cat-idx]");
   }
 
-  // Results page filter tabs: 전체 | 즐겨찾기 | 1. 기도 | 2. 믿음 | 3. 미정
+  // Results page filter tabs: 전체 | 즐겨찾기 | 1. 기도 | 2. 믿음 | 3. 미정 (draggable)
   const resultsTabs = document.querySelector("#results .filter-tabs");
   if (resultsTabs) {
     const allBtn = `<button type="button" class="filter ${state.activeCategoryFilter === "전체" ? "active" : ""}" data-filter-cat="전체">전체 <span>${state.summaries.length}</span></button>`;
@@ -2024,7 +2095,7 @@ function renderCategoriesUI() {
     const catBtns = state.categories
       .map(
         (cat, idx) => `
-        <button type="button" class="filter ${state.activeCategoryFilter === cat.name ? "active" : ""}" data-filter-cat="${escapeHtml(cat.name)}">
+        <button type="button" draggable="true" data-cat-idx="${idx}" title="드래그하여 분류 순서 변경" class="filter ${state.activeCategoryFilter === cat.name ? "active" : ""}" data-filter-cat="${escapeHtml(cat.name)}">
           ${cat.name !== "미정" ? `<span class="dot ${escapeHtml(cat.color || "sage")}"></span>` : ""}${idx + 1}. ${escapeHtml(cat.name)} <span>${getCategoryCount(cat.name)}</span>
         </button>
       `
@@ -2040,6 +2111,7 @@ function renderCategoriesUI() {
         renderResultsLibrary();
       });
     });
+    bindCategoryDragEvents(resultsTabs, "[data-cat-idx]");
   }
 
   // Public view page filter tabs: 전체 | 즐겨찾기 | 1. 기도 | 2. 믿음 | 3. 미정
@@ -2084,25 +2156,46 @@ function renderCategoriesUI() {
       .join("");
   }
 
-  // Category Editor Modal
+  // Category Editor Modal (Drag-and-drop + Up/Down buttons)
   const editorList = document.getElementById("category-editor-list");
   if (editorList) {
     editorList.innerHTML = state.categories
       .map((cat, idx) => {
+        const moveBtns = `
+          <button type="button" class="icon-button" data-move-cat-up="${idx}" title="위로 이동" ${idx === 0 ? "disabled" : ""} style="width:24px;height:24px;font-size:11px">▲</button>
+          <button type="button" class="icon-button" data-move-cat-down="${idx}" title="아래로 이동" ${idx === state.categories.length - 1 ? "disabled" : ""} style="width:24px;height:24px;font-size:11px">▼</button>
+        `;
         if (cat.fixed || cat.name === "미정") {
-          return `<div><span class="dot gray"></span><strong class="cat-num">${idx + 1}.</strong><span class="fixed-category">미정</span><small>기본 분류 · 삭제 불가</small></div>`;
+          return `<div draggable="true" data-cat-idx="${idx}" data-cat-id="${escapeHtml(cat.id)}" title="드래그하여 분류 순서 변경"><span class="cat-drag-grip" aria-hidden="true">⋮⋮</span><span class="dot gray"></span><strong class="cat-num">${idx + 1}.</strong><span class="fixed-category">미정</span><small>기본 분류 · 삭제 불가</small>${moveBtns}</div>`;
         }
         return `
-          <div data-cat-id="${escapeHtml(cat.id)}">
+          <div draggable="true" data-cat-idx="${idx}" data-cat-id="${escapeHtml(cat.id)}" title="드래그하여 분류 순서 변경">
+            <span class="cat-drag-grip" aria-hidden="true">⋮⋮</span>
             <span class="dot ${escapeHtml(cat.color || "sage")}"></span>
             <strong class="cat-num">${idx + 1}.</strong>
             <input value="${escapeHtml(cat.name)}" aria-label="${escapeHtml(cat.name)} 분류명 수정">
+            ${moveBtns}
             <button type="button" class="icon-button" data-save-cat="${escapeHtml(cat.id)}" title="이름 수정 저장">${iconSvg("edit")}</button>
             <button type="button" class="icon-button" data-del-cat="${escapeHtml(cat.id)}" title="분류 삭제">${iconSvg("trash")}</button>
           </div>
         `;
       })
       .join("");
+
+    bindCategoryDragEvents(editorList, "[data-cat-idx]");
+
+    editorList.querySelectorAll("[data-move-cat-up]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const idx = Number(btn.dataset.moveCatUp);
+        reorderCategoryByIndices(idx, idx - 1);
+      });
+    });
+    editorList.querySelectorAll("[data-move-cat-down]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const idx = Number(btn.dataset.moveCatDown);
+        reorderCategoryByIndices(idx, idx + 1);
+      });
+    });
 
     editorList.querySelectorAll("[data-save-cat]").forEach((btn) => {
       const saveCatRow = () => {
@@ -4774,12 +4867,6 @@ document.getElementById("detail-category-edit-btn")?.addEventListener("click", (
 document.getElementById("detail-category-badge")?.addEventListener("click", () => {
   openCategoryPickerForSummary(state.currentSummaryId);
 });
-document.getElementById("reader-category-badge")?.addEventListener("click", () => {
-  openCategoryPickerForSummary(state.currentSummaryId);
-});
-document.getElementById("reader-category-edit-btn")?.addEventListener("click", () => {
-  openCategoryPickerForSummary(state.currentSummaryId);
-});
 
 document.getElementById("detail-kakao-share-btn")?.addEventListener("click", () => {
   openKakaoShareModal(state.currentSummaryId);
@@ -5054,8 +5141,8 @@ function renderPublicView() {
         <article class="public-item">
           <span class="public-number">${numStr}</span>
           <div class="public-item-body">
-            <div><span class="tag tag-${escapeHtml(getCategoryColor(primaryCat))}" data-pub-cat-edit="${item.id}" title="클릭하여 분류 수정" style="cursor:pointer">${escapeHtml((item.categories || ["미정"]).map((c) => getCategoryNumberedLabel(c)).join(", "))}</span><button type="button" class="row-title-edit-btn" data-pub-cat-edit="${item.id}" title="분류 수정" aria-label="#${item.id} 분류 수정" style="margin-right:4px">${iconSvg("edit")}</button><span class="public-date">${escapeHtml(item.date)}</span></div>
-            <a href="#summary" data-pub-open="${item.id}"><h3>${escapeHtml(item.title)}</h3></a>
+            <div><span class="tag tag-${escapeHtml(getCategoryColor(primaryCat))}">${escapeHtml((item.categories || ["미정"]).map((c) => getCategoryNumberedLabel(c)).join(", "))}</span><span class="public-date">${escapeHtml(item.date)}</span></div>
+            <a href="#view?id=${item.id}" data-pub-open="${item.id}"><h3>${escapeHtml(item.title)}</h3></a>
             ${item.quality?.method === "audio-ai" ? '<span class="tag">원음 검토 필요 · 날짜·수량 확인</span>' : ""}
             ${item.quality?.warnings?.length ? '<span class="tag">분량·범위 검토 필요</span>' : ""}
             <p>${escapeHtml(item.excerpt || "")}</p>
@@ -5063,6 +5150,7 @@ function renderPublicView() {
           </div>
           <div class="public-item-actions">
             <button type="button" class="bookmark-button" data-pub-tts="${item.id}" title="요약본 TTS 음성 듣기" aria-label="${escapeHtml(item.title)} TTS 듣기">${iconSvg("volume")}</button>
+            <button type="button" class="bookmark-button" data-pub-kakao="${item.id}" title="카카오톡으로 제목 · 링크 전달" aria-label="${escapeHtml(item.title)} 카카오톡 전달">${iconSvg("message")}</button>
             <a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer" class="public-youtube" aria-label="${escapeHtml(item.title)} 유튜브 바로가기">${iconSvg("youtube")}<span>유튜브</span>${iconSvg("arrow-up-right")}</a>
             <button type="button" class="bookmark-button ${item.bookmarked ? "saved" : ""}" data-toggle-bm="${item.id}" aria-label="즐겨찾기 토글" aria-pressed="${item.bookmarked}">${iconSvg("bookmark")}</button>
           </div>
@@ -5103,9 +5191,17 @@ function renderPublicView() {
     btn.addEventListener("click", () => {
       const id = Number(btn.dataset.pubTts);
       state.currentSummaryId = id;
-      saveAppState();
+      saveLocalState();
       openPublicReaderModal(id);
-      setTimeout(() => startTtsPlayback("reader"), 120);
+      // Call startTtsPlayback synchronously inside user gesture so mobile iOS/Android allows speechSynthesis
+      startTtsPlayback("reader");
+    });
+  });
+
+  listContainer.querySelectorAll("[data-pub-kakao]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const id = Number(btn.dataset.pubKakao);
+      openKakaoShareModal(id);
     });
   });
 
@@ -5115,18 +5211,12 @@ function renderPublicView() {
       const target = state.summaries.find((s) => s.id === id);
       if (!target) return;
       target.bookmarked = !target.bookmarked;
-      saveAppState();
+      if (serverBaseline) saveAppState();
+      else saveLocalState();
       renderCategoriesUI();
       renderResultsLibrary();
       renderPublicView();
       showToast(target.bookmarked ? "즐겨찾기에 추가되었습니다." : "즐겨찾기에서 해제되었습니다.");
-    });
-  });
-
-  listContainer.querySelectorAll("[data-pub-cat-edit]").forEach((el) => {
-    el.addEventListener("click", () => {
-      const id = Number(el.dataset.pubCatEdit);
-      openCategoryPickerForSummary(id);
     });
   });
 }
@@ -5140,28 +5230,49 @@ function openPublicReaderModal(summaryId) {
   if (catBadge) {
     catBadge.className = `tag tag-${getCategoryColor(primaryCat)}`;
     catBadge.textContent = (item.categories || ["미정"]).map((c) => getCategoryNumberedLabel(c)).join(", ");
-    catBadge.style.cursor = "pointer";
-    catBadge.title = "클릭하여 분류 수정";
+    catBadge.style.cursor = "default";
+    catBadge.removeAttribute("title");
   }
   document.getElementById("reader-date").textContent = item.date;
   document.getElementById("reader-channel").textContent = `· ${item.channel}`;
   document.getElementById("reader-modal-title").textContent = item.title;
-  document.getElementById("reader-article-content").innerHTML = item.editedHtml || item.originalHtml;
-  document.getElementById("reader-takeaways").innerHTML = renderTakeawaysListHtml(item.takeaways || []);
+  const readerContentEl = document.getElementById("reader-article-content");
+  if (readerContentEl) {
+    readerContentEl.innerHTML = item.editedHtml || item.originalHtml;
+    readerContentEl.querySelectorAll("h2.hanaro-h2-major, h3.hanaro-h3, p.hanaro-p").forEach((el) => {
+      el.title = "클릭(터치) 시 이 문단부터 TTS 음성 낭독을 시작합니다";
+      el.addEventListener("click", () => {
+        startTtsPlaybackFromElement(el, "reader");
+      });
+    });
+  }
+  const readerTakeawaysEl = document.getElementById("reader-takeaways");
+  if (readerTakeawaysEl) {
+    readerTakeawaysEl.innerHTML = renderTakeawaysListHtml(item.takeaways || []);
+    readerTakeawaysEl.querySelectorAll("li").forEach((li) => {
+      li.style.cursor = "pointer";
+      li.title = "클릭(터치) 시 이 핵심 요점부터 TTS 음성 낭독을 시작합니다";
+      li.addEventListener("click", () => {
+        startTtsPlaybackFromElement(li, "reader");
+      });
+    });
+  }
   const ytLink = document.getElementById("reader-youtube-link");
   if (ytLink) ytLink.href = item.url;
   const bmBtn = document.getElementById("reader-bookmark-btn");
   if (bmBtn) {
     bmBtn.innerHTML = `${iconSvg("bookmark")}${item.bookmarked ? "즐겨찾기됨" : "즐겨찾기"}`;
   }
-  document.getElementById("public-reader-modal")?.showModal();
+  const modal = document.getElementById("public-reader-modal");
+  if (modal && !modal.open) modal.showModal();
 }
 
 document.getElementById("reader-bookmark-btn")?.addEventListener("click", () => {
   const item = state.summaries.find((s) => s.id === state.currentSummaryId);
   if (!item) return;
   item.bookmarked = !item.bookmarked;
-  saveAppState();
+  if (serverBaseline) saveAppState();
+  else saveLocalState();
   renderCategoriesUI();
   renderResultsLibrary();
   renderPublicView();
@@ -5173,13 +5284,6 @@ document.getElementById("reader-bookmark-btn")?.addEventListener("click", () => 
 document.getElementById("reader-kakao-btn")?.addEventListener("click", () => {
   document.getElementById("public-reader-modal")?.close();
   openKakaoShareModal(state.currentSummaryId);
-});
-
-document.getElementById("reader-admin-edit-btn")?.addEventListener("click", () => {
-  stopTtsPlayback();
-  document.getElementById("public-reader-modal")?.close();
-  renderSummaryDetail(state.currentSummaryId);
-  window.location.hash = "summary";
 });
 
 // 9-B. TTS (Text-to-Speech) Voice Reader Engine
@@ -5221,7 +5325,8 @@ function clearTtsDomHighlight() {
 }
 
 function buildTtsQueue(context = "detail") {
-  const scope = document.getElementById("tts-scope-select")?.value || "all";
+  const scopeSelectId = context === "reader" ? "reader-tts-scope-select" : "tts-scope-select";
+  const scope = document.getElementById(scopeSelectId)?.value || "all";
   const contentContainer =
     context === "reader"
       ? document.getElementById("reader-article-content")
@@ -5236,6 +5341,7 @@ function buildTtsQueue(context = "detail") {
   if (scope === "all" || scope === "summary") {
     if (contentContainer) {
       contentContainer.querySelectorAll("h1, h2, h3, p, li, .script-segment-row").forEach((el) => {
+        if (el.closest(".summary-evidence")) return;
         const txt = el.innerText.replace(/\s+/g, " ").trim();
         if (txt && txt !== "요약" && txt.length >= 2) {
           queue.push({ text: txt, element: el });
@@ -5263,29 +5369,36 @@ function updateTtsButtonsUI() {
   const detailBtnLabel = document.getElementById("detail-tts-btn-label");
   const readerBtnLabel = document.getElementById("reader-tts-label");
   const playPauseBtn = document.getElementById("tts-play-pause-btn");
+  const readerPlayPauseBtn = document.getElementById("reader-tts-play-pause-btn");
   const bar = document.getElementById("tts-player-bar");
+  const readerBar = document.getElementById("reader-tts-player-bar");
 
   if (!ttsIsPlaying) {
     if (detailBtnLabel) detailBtnLabel.textContent = "TTS 듣기";
     if (readerBtnLabel) readerBtnLabel.textContent = "TTS 듣기";
     if (bar) bar.hidden = true;
+    if (readerBar) readerBar.hidden = true;
     clearTtsDomHighlight();
     return;
   }
 
-  if (bar && ttsTargetContext === "detail") bar.hidden = false;
+  if (bar) bar.hidden = ttsTargetContext !== "detail";
+  if (readerBar) readerBar.hidden = ttsTargetContext !== "reader";
   if (detailBtnLabel) {
     detailBtnLabel.textContent = ttsIsPaused ? "TTS 이어듣기" : "TTS 일시정지";
   }
   if (readerBtnLabel) {
-    readerBtnLabel.textContent = ttsIsPaused ? "TTS 이어듣기" : "TTS 정지";
+    readerBtnLabel.textContent = ttsIsPaused ? "TTS 이어듣기" : "TTS 일시정지";
   }
-  if (playPauseBtn) {
-    playPauseBtn.innerHTML = ttsIsPaused
-      ? `${iconSvg("play")}<span>재생</span>`
-      : `${iconSvg("pause")}<span>일시정지</span>`;
-  }
+  const ppHtml = ttsIsPaused
+    ? `${iconSvg("play")}<span>재생</span>`
+    : `${iconSvg("pause")}<span>일시정지</span>`;
+  if (playPauseBtn) playPauseBtn.innerHTML = ppHtml;
+  if (readerPlayPauseBtn) readerPlayPauseBtn.innerHTML = ppHtml;
 }
+
+let activeTtsUtterance = null;
+let mobileTtsKeepAliveTimer = null;
 
 function speakCurrentTtsChunk() {
   if (!("speechSynthesis" in window)) {
@@ -5297,7 +5410,12 @@ function speakCurrentTtsChunk() {
     return;
   }
 
+  window.clearInterval(mobileTtsKeepAliveTimer);
   window.speechSynthesis.cancel();
+  if (window.speechSynthesis.paused) {
+    try { window.speechSynthesis.resume(); } catch (e) {}
+  }
+
   const currentItem = ttsQueue[ttsCurrentIdx];
   clearTtsDomHighlight();
   if (currentItem.element) {
@@ -5305,24 +5423,48 @@ function speakCurrentTtsChunk() {
     currentItem.element.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 
+  const progText = `구간 ${ttsCurrentIdx + 1} / ${ttsQueue.length}`;
   const progEl = document.getElementById("tts-progress-text");
-  if (progEl) progEl.textContent = `구간 ${ttsCurrentIdx + 1} / ${ttsQueue.length}`;
+  if (progEl) progEl.textContent = progText;
+  const readerProgEl = document.getElementById("reader-tts-progress-text");
+  if (readerProgEl) readerProgEl.textContent = progText;
+
   const sentEl = document.getElementById("tts-current-sentence");
   if (sentEl) sentEl.textContent = currentItem.text;
+  const readerSentEl = document.getElementById("reader-tts-current-sentence");
+  if (readerSentEl) readerSentEl.textContent = currentItem.text;
 
   const utter = new SpeechSynthesisUtterance(currentItem.text);
+  activeTtsUtterance = utter;
   utter.lang = "ko-KR";
-  const rateVal = Number(document.getElementById("tts-rate-select")?.value || 1);
+  const rateSelectId = ttsTargetContext === "reader" ? "reader-tts-rate-select" : "tts-rate-select";
+  const rateVal = Number(document.getElementById(rateSelectId)?.value || 1);
   utter.rate = rateVal;
 
   const chosenVoiceName = document.getElementById("tts-voice-select")?.value || "";
+  const voices = window.speechSynthesis.getVoices() || [];
   if (chosenVoiceName) {
-    const voices = window.speechSynthesis.getVoices() || [];
     const found = voices.find((v) => v.name === chosenVoiceName);
     if (found) utter.voice = found;
+  } else {
+    const koVoice = voices.find((v) => v.lang && v.lang.toLowerCase().startsWith("ko"));
+    if (koVoice) utter.voice = koVoice;
   }
 
+  // Mobile/Chrome keep-alive workaround so long utterances don't freeze mid-sentence
+  mobileTtsKeepAliveTimer = window.setInterval(() => {
+    if (!ttsIsPlaying || ttsIsPaused) {
+      window.clearInterval(mobileTtsKeepAliveTimer);
+      return;
+    }
+    if (window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
+      window.speechSynthesis.pause();
+      window.speechSynthesis.resume();
+    }
+  }, 12000);
+
   utter.onend = () => {
+    window.clearInterval(mobileTtsKeepAliveTimer);
     if (!ttsIsPlaying || ttsIsPaused) return;
     ttsCurrentIdx++;
     if (ttsCurrentIdx < ttsQueue.length) {
@@ -5333,6 +5475,7 @@ function speakCurrentTtsChunk() {
   };
 
   utter.onerror = () => {
+    window.clearInterval(mobileTtsKeepAliveTimer);
     if (!ttsIsPlaying || ttsIsPaused) return;
     ttsCurrentIdx++;
     if (ttsCurrentIdx < ttsQueue.length) {
@@ -5345,13 +5488,16 @@ function speakCurrentTtsChunk() {
   window.speechSynthesis.speak(utter);
 }
 
-function startTtsPlaybackFromElement(clickedEl) {
-  if (!("speechSynthesis" in window)) return;
+function startTtsPlaybackFromElement(clickedEl, context = "detail") {
+  if (!("speechSynthesis" in window)) {
+    showToast("이 브라우저는 TTS 음성 합성을 지원하지 않습니다.");
+    return;
+  }
   populateTtsVoices();
-  ttsTargetContext = "detail";
-  ttsQueue = buildTtsQueue("detail");
+  ttsTargetContext = context;
+  ttsQueue = buildTtsQueue(context);
   if (!ttsQueue.length) return;
-  const foundIdx = ttsQueue.findIndex((q) => q.element === clickedEl);
+  const foundIdx = ttsQueue.findIndex((q) => q.element === clickedEl || clickedEl.contains(q.element) || q.element.contains(clickedEl));
   ttsCurrentIdx = foundIdx >= 0 ? foundIdx : 0;
   ttsIsPlaying = true;
   ttsIsPaused = false;
@@ -5381,13 +5527,12 @@ function startTtsPlayback(context = "detail") {
 
 function togglePauseTtsPlayback() {
   if (!ttsIsPlaying) {
-    startTtsPlayback("detail");
+    startTtsPlayback(ttsTargetContext || "detail");
     return;
   }
   if (ttsIsPaused) {
     ttsIsPaused = false;
     window.speechSynthesis.resume();
-    // If browser lost utterance state during pause, re-speak current chunk
     if (!window.speechSynthesis.speaking) {
       speakCurrentTtsChunk();
     }
@@ -5400,6 +5545,8 @@ function togglePauseTtsPlayback() {
 }
 
 function stopTtsPlayback(completed = false) {
+  window.clearInterval(mobileTtsKeepAliveTimer);
+  activeTtsUtterance = null;
   if ("speechSynthesis" in window) {
     window.speechSynthesis.cancel();
   }
@@ -5468,8 +5615,38 @@ document.getElementById("reader-tts-btn")?.addEventListener("click", () => {
   if (!ttsIsPlaying || ttsTargetContext !== "reader") {
     startTtsPlayback("reader");
   } else {
-    stopTtsPlayback(false);
-    showToast("TTS 음성 낭독을 정지했습니다.");
+    togglePauseTtsPlayback();
+  }
+});
+document.getElementById("reader-tts-play-pause-btn")?.addEventListener("click", () => {
+  togglePauseTtsPlayback();
+});
+document.getElementById("reader-tts-stop-btn")?.addEventListener("click", () => {
+  stopTtsPlayback(false);
+  showToast("TTS 음성 낭독을 정지했습니다.");
+});
+document.getElementById("reader-tts-prev-btn")?.addEventListener("click", () => {
+  if (!ttsIsPlaying || !ttsQueue.length) return;
+  ttsCurrentIdx = Math.max(0, ttsCurrentIdx - 1);
+  ttsIsPaused = false;
+  updateTtsButtonsUI();
+  speakCurrentTtsChunk();
+});
+document.getElementById("reader-tts-next-btn")?.addEventListener("click", () => {
+  if (!ttsIsPlaying || !ttsQueue.length) return;
+  ttsCurrentIdx = Math.min(ttsQueue.length - 1, ttsCurrentIdx + 1);
+  ttsIsPaused = false;
+  updateTtsButtonsUI();
+  speakCurrentTtsChunk();
+});
+document.getElementById("reader-tts-rate-select")?.addEventListener("change", () => {
+  if (ttsIsPlaying && !ttsIsPaused && ttsTargetContext === "reader") {
+    speakCurrentTtsChunk();
+  }
+});
+document.getElementById("reader-tts-scope-select")?.addEventListener("change", () => {
+  if (ttsIsPlaying && ttsTargetContext === "reader") {
+    startTtsPlayback("reader");
   }
 });
 
@@ -5499,12 +5676,22 @@ publicSearchInput?.addEventListener("input", () => {
   }, 160);
 });
 
-// 10. KakaoTalk Share Modal (Public Page URL + Launch KakaoTalk)
+// 10. KakaoTalk Share Modal (Public Page URL + Title Delivery)
 let currentShareItem = null;
+const PUBLIC_WEB_SHARE_BASE = "https://daehann-svg.github.io/yousunsaeng/";
 
 function getPublicShareUrl(item) {
-  const baseUrl = window.location.href.split("#")[0];
-  return `${baseUrl}#view?id=${item.id}`;
+  const isLocalHost = ["127.0.0.1", "localhost"].includes(window.location.hostname);
+  if (!isLocalHost) {
+    const baseUrl = window.location.href.split("#")[0];
+    return `${baseUrl}#view?id=${item.id}`;
+  }
+  return `${PUBLIC_WEB_SHARE_BASE}#view?id=${item.id}`;
+}
+
+function buildKakaoShareMessage(item) {
+  const publicUrl = getPublicShareUrl(item);
+  return `${item.title}\n${publicUrl}`;
 }
 
 function openKakaoShareModal(summaryId) {
@@ -5512,38 +5699,34 @@ function openKakaoShareModal(summaryId) {
   if (!item) return;
   currentShareItem = item;
   const publicUrl = getPublicShareUrl(item);
+  const shareMessage = buildKakaoShareMessage(item);
   document.getElementById("kakao-video-title").textContent = item.title;
-  document.getElementById("kakao-video-desc").textContent = `${item.channel} · ${item.template || "기본서식"}(${item.ratio}%) · You선생 공개 페이지`;
+  document.getElementById("kakao-video-desc").textContent = `${item.channel} · You선생 공개 웹페이지`;
   const urlInput = document.getElementById("kakao-public-url-input");
   if (urlInput) urlInput.value = publicUrl;
-  const jsKeyInput = document.getElementById("kakao-js-key-input");
-  if (jsKeyInput) jsKeyInput.value = state.kakaoJsKey || "";
+  const previewArea = document.getElementById("kakao-share-message-preview");
+  if (previewArea) previewArea.value = shareMessage;
   document.getElementById("share").showModal();
 }
 
-document.getElementById("kakao-js-key-input")?.addEventListener("input", (e) => {
-  state.kakaoJsKey = e.target.value.trim();
-  saveAppState();
-});
-
 document.getElementById("kakao-copy-url-btn")?.addEventListener("click", async () => {
   if (!currentShareItem) return;
-  const publicUrl = getPublicShareUrl(currentShareItem);
+  const shareMessage = buildKakaoShareMessage(currentShareItem);
   try {
-    await navigator.clipboard.writeText(publicUrl);
-    showToast("You선생 공개 페이지 주소가 클립보드에 복사되었습니다.");
+    await navigator.clipboard.writeText(shareMessage);
+    showToast("요약 제목과 공개 웹페이지 링크가 클립보드에 복사되었습니다.");
   } catch (e) {
-    showToast(`공개 페이지 주소: ${publicUrl}`);
+    showToast(shareMessage);
   }
 });
 
 document.getElementById("kakao-send-btn")?.addEventListener("click", async () => {
   if (!currentShareItem) return;
   const publicUrl = getPublicShareUrl(currentShareItem);
-  const shareTitle = `[You선생] ${currentShareItem.title}`;
-  const shareText = `${shareTitle}\n채널: ${currentShareItem.channel}\n분류: ${(currentShareItem.categories || ["미정"]).map((c) => getCategoryNumberedLabel(c)).join(", ")}\n\n👉 You선생 공개 페이지 바로가기:\n${publicUrl}`;
+  const shareTitle = currentShareItem.title;
+  const shareText = buildKakaoShareMessage(currentShareItem);
 
-  // 1. Copy to clipboard first so user can paste immediately in KakaoTalk PC/Mobile
+  // 1. Copy title + web link to clipboard first so user can paste immediately in KakaoTalk PC/Mobile
   try {
     await navigator.clipboard.writeText(shareText);
   } catch (e) {
@@ -5555,7 +5738,7 @@ document.getElementById("kakao-send-btn")?.addEventListener("click", async () =>
     try {
       await navigator.share({
         title: shareTitle,
-        text: `${currentShareItem.channel} · 핵심 요약 보기`,
+        text: shareTitle,
         url: publicUrl
       });
       document.getElementById("share").close();
@@ -5574,18 +5757,19 @@ document.getElementById("kakao-send-btn")?.addEventListener("click", async () =>
   setTimeout(() => iframe.remove(), 2000);
 
   document.getElementById("share").close();
-  showToast("카카오톡 앱을 호출했습니다! (공개 페이지 주소가 복사되어 대화창에 바로 붙여넣을 수 있습니다)");
+  showToast("카카오톡을 호출했습니다! (제목과 웹페이지 링크가 복사되어 대화창에 바로 붙여넣을 수 있습니다)");
 });
 
 document.getElementById("kakao-preview-link-btn")?.addEventListener("click", () => {
   if (currentShareItem) {
     state.currentSummaryId = currentShareItem.id;
     currentShareItem.published = true;
-    saveAppState();
+    if (serverBaseline) saveAppState();
+    else saveLocalState();
     renderPublicView();
   }
   document.getElementById("share").close();
-  window.location.hash = "view";
+  window.location.hash = currentShareItem ? `view?id=${currentShareItem.id}` : "view";
 });
 
 // 11. GitHub Registration, Source Auto-Upload & Web/Server Connectivity Check
@@ -5888,6 +6072,7 @@ const routeTitles = {
 };
 
 function showPage() {
+  const isStaticPublic = document.body.classList.contains("static-public-mode");
   const rawHash = window.location.hash.slice(1);
   const [requested, queryStr] = rawHash.split("?");
   if (requested !== "summary" && requested !== "view") {
@@ -5901,7 +6086,12 @@ function showPage() {
       state.currentSummaryId = sharedId;
     }
   }
-  const route = Object.prototype.hasOwnProperty.call(routeTitles, requested) ? requested : "results";
+  const route = isStaticPublic
+    ? "view"
+    : Object.prototype.hasOwnProperty.call(routeTitles, requested)
+    ? requested
+    : "results";
+  document.body.classList.toggle("public-route-active", route === "view");
   document.querySelectorAll(".page").forEach((page) => {
     page.hidden = page.id !== route;
   });
