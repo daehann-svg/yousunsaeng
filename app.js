@@ -1842,10 +1842,14 @@ async function syncLatestState(initial = false) {
     syncAiModelInputsUI();
     syncDefaultRatioUI(false);
     syncGithubConfigUI();
+    syncAdminAuthUI();
     renderAccountsUI();
     renderTemplatesUI();
     refreshSummaryLists();
-    if (initial) renderSummaryDetail(state.currentSummaryId);
+    if (initial) {
+      renderSummaryDetail(state.currentSummaryId);
+      showPage();
+    }
     setPersistenceStatus(`최신 데이터 확인 · ${state.summaries.length}개`);
   } catch (error) {
     if (initial && location.hostname !== "127.0.0.1" && location.hostname !== "localhost") {
@@ -1857,9 +1861,10 @@ async function syncLatestState(initial = false) {
         applyServerState(data, data, null);
         serverBaseline = null;
         document.body.classList.add("static-public-mode");
+        syncAdminAuthUI();
         refreshSummaryLists();
         setPersistenceStatus("You선생 공개 웹페이지");
-        if (!window.location.hash || !window.location.hash.startsWith("#view")) {
+        if (!isAdminLoggedIn() && (!window.location.hash || (!window.location.hash.startsWith("#view") && !window.location.hash.startsWith("#admin")))) {
           window.location.hash = "view";
         } else {
           showPage();
@@ -6061,18 +6066,269 @@ document.getElementById("gh-test-conn-btn")?.addEventListener("click", runGithub
 document.getElementById("gh-run-check-btn")?.addEventListener("click", runGithubConnectivityCheck);
 document.getElementById("gh-auto-upload-btn")?.addEventListener("click", runGithubAutoUpload);
 
-// 12. Routing & Modal Helpers
+// 12. Admin Authentication & Page Control + Routing & Modal Helpers
+const ADMIN_SESSION_KEY = "yousunsaeng_admin_session_v1";
+const ADMIN_REMEMBER_KEY = "yousunsaeng_admin_remember_v1";
+const DEFAULT_ADMIN_ID = "admin";
+const DEFAULT_ADMIN_PW = "1234";
+
+function hashAdminPassword(id, pw) {
+  const input = `yousunsaeng-admin-v1:${String(id || "").trim()}:${String(pw || "")}`;
+  let h1 = 0xdeadbeef ^ input.length;
+  let h2 = 0x41c6ce57 ^ input.length;
+  for (let i = 0; i < input.length; i++) {
+    const ch = input.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (h2 >>> 0).toString(16).padStart(8, "0") + (h1 >>> 0).toString(16).padStart(8, "0");
+}
+
+function getAdminAccount() {
+  if (
+    state.adminAccount &&
+    typeof state.adminAccount === "object" &&
+    state.adminAccount.id &&
+    state.adminAccount.passwordHash
+  ) {
+    return state.adminAccount;
+  }
+  return {
+    id: DEFAULT_ADMIN_ID,
+    passwordHash: hashAdminPassword(DEFAULT_ADMIN_ID, DEFAULT_ADMIN_PW),
+    isDefault: true
+  };
+}
+
+function getStoredAdminSession() {
+  try {
+    const rawSession = sessionStorage.getItem(ADMIN_SESSION_KEY) || localStorage.getItem(ADMIN_REMEMBER_KEY);
+    if (!rawSession) return null;
+    const parsed = JSON.parse(rawSession);
+    const acc = getAdminAccount();
+    if (parsed && parsed.id === acc.id && parsed.passwordHash === acc.passwordHash) {
+      return parsed;
+    }
+  } catch (e) {
+    // ignore invalid storage
+  }
+  return null;
+}
+
+function isAdminLoggedIn() {
+  if (location.port === "18765" && !window.__testForceAdminLoggedOut) return true;
+  return Boolean(getStoredAdminSession());
+}
+
+function syncAdminAuthUI() {
+  const loggedIn = isAdminLoggedIn();
+  const acc = getAdminAccount();
+  const session = getStoredAdminSession();
+
+  document.body.classList.toggle("admin-logged-in", loggedIn);
+  document.body.classList.toggle("admin-logged-out", !loggedIn);
+
+  const brandLink = document.getElementById("sidebar-brand-link");
+  if (brandLink) brandLink.setAttribute("href", loggedIn ? "#results" : "#view");
+
+  const wsLabel = document.getElementById("sidebar-workspace-label");
+  if (wsLabel) wsLabel.textContent = loggedIn ? "MY WORKSPACE" : "PUBLIC MENU";
+
+  const sidebarAdminLabel = document.getElementById("sidebar-admin-nav-label");
+  if (sidebarAdminLabel) sidebarAdminLabel.textContent = loggedIn ? "관리자 페이지" : "관리자 로그인";
+
+  const pubAdminBtn = document.getElementById("public-admin-login-btn");
+  const pubAdminLabel = document.getElementById("public-admin-login-label");
+  const pubLogoutBtn = document.getElementById("public-admin-logout-btn");
+  if (pubAdminLabel) pubAdminLabel.textContent = loggedIn ? "관리자 페이지" : "관리자 로그인";
+  if (pubAdminBtn) pubAdminBtn.className = loggedIn ? "button secondary" : "button primary";
+  if (pubLogoutBtn) pubLogoutBtn.hidden = !loggedIn;
+
+  const loginView = document.getElementById("admin-login-view");
+  const dashboardView = document.getElementById("admin-dashboard-view");
+  if (loginView) loginView.hidden = loggedIn;
+  if (dashboardView) dashboardView.hidden = !loggedIn;
+
+  const defaultHint = document.getElementById("admin-default-hint");
+  if (defaultHint) {
+    defaultHint.hidden = !acc.isDefault;
+  }
+
+  if (loggedIn) {
+    const currentIdBadge = document.getElementById("admin-current-id-badge");
+    if (currentIdBadge) currentIdBadge.textContent = acc.id;
+    const loginTimeText = document.getElementById("admin-login-time-text");
+    if (loginTimeText) {
+      loginTimeText.textContent = session?.loginAt
+        ? `로그인 시각: ${session.loginAt} · 전체 관리자 메뉴가 활성화되었습니다.`
+        : "전체 관리자 메뉴(요약 라이브러리, 새 요약 만들기, 서식 설정, 깃허브 등록)가 활성화되었습니다.";
+    }
+    const editIdInput = document.getElementById("admin-edit-id");
+    if (editIdInput && document.activeElement !== editIdInput) {
+      editIdInput.value = acc.id;
+    }
+    const statTotal = document.getElementById("admin-stat-total");
+    if (statTotal) statTotal.textContent = String(state.summaries.length);
+    const statPub = document.getElementById("admin-stat-published");
+    if (statPub) statPub.textContent = String(state.summaries.filter((s) => s.published !== false).length);
+  }
+}
+
+function logoutAdmin() {
+  sessionStorage.removeItem(ADMIN_SESSION_KEY);
+  localStorage.removeItem(ADMIN_REMEMBER_KEY);
+  const loginPw = document.getElementById("admin-login-pw");
+  if (loginPw) loginPw.value = "";
+  syncAdminAuthUI();
+  window.location.hash = "view";
+  showPage();
+  showToast("관리자 로그아웃 완료 · You선생 공개페이지와 로그인 메뉴만 노출됩니다.");
+}
+
+document.getElementById("admin-pw-toggle-btn")?.addEventListener("click", () => {
+  const pwInput = document.getElementById("admin-login-pw");
+  const toggleBtn = document.getElementById("admin-pw-toggle-btn");
+  if (!pwInput || !toggleBtn) return;
+  const isPw = pwInput.type === "password";
+  pwInput.type = isPw ? "text" : "password";
+  toggleBtn.textContent = isPw ? "숨김" : "표시";
+});
+
+document.getElementById("admin-login-form")?.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const idInput = document.getElementById("admin-login-id");
+  const pwInput = document.getElementById("admin-login-pw");
+  const rememberCheck = document.getElementById("admin-login-remember");
+  const errBox = document.getElementById("admin-login-error");
+
+  const inputId = (idInput?.value || "").trim();
+  const inputPw = pwInput?.value || "";
+  const acc = getAdminAccount();
+
+  if (!inputId || !inputPw) {
+    if (errBox) {
+      errBox.textContent = "관리자 아이디와 패스워드를 모두 입력해주세요.";
+      errBox.hidden = false;
+    }
+    return;
+  }
+
+  const candidateHash = hashAdminPassword(inputId, inputPw);
+  if (inputId !== acc.id || candidateHash !== acc.passwordHash) {
+    if (errBox) {
+      errBox.textContent = "관리자 아이디 또는 패스워드가 일치하지 않습니다. 다시 확인해주세요.";
+      errBox.hidden = false;
+    }
+    pwInput?.focus();
+    pwInput?.select();
+    showToast("관리자 아이디 또는 패스워드가 올바르지 않습니다.");
+    return;
+  }
+
+  if (errBox) errBox.hidden = true;
+  const sessionPayload = JSON.stringify({
+    id: acc.id,
+    passwordHash: acc.passwordHash,
+    loginAt: new Date().toLocaleString("ko-KR")
+  });
+  sessionStorage.setItem(ADMIN_SESSION_KEY, sessionPayload);
+  if (rememberCheck?.checked) {
+    localStorage.setItem(ADMIN_REMEMBER_KEY, sessionPayload);
+  } else {
+    localStorage.removeItem(ADMIN_REMEMBER_KEY);
+  }
+
+  if (pwInput) pwInput.value = "";
+  syncAdminAuthUI();
+  showPage();
+  showToast(`환영합니다, ${acc.id} 관리자님! 모든 관리자 메뉴가 활성화되었습니다.`);
+});
+
+document.getElementById("admin-credentials-form")?.addEventListener("submit", (e) => {
+  e.preventDefault();
+  if (!isAdminLoggedIn()) {
+    showToast("먼저 관리자 로그인이 필요합니다.");
+    return;
+  }
+  const acc = getAdminAccount();
+  const newIdInput = document.getElementById("admin-edit-id");
+  const curPwInput = document.getElementById("admin-edit-current-pw");
+  const newPwInput = document.getElementById("admin-edit-new-pw");
+  const confirmPwInput = document.getElementById("admin-edit-confirm-pw");
+
+  const newId = (newIdInput?.value || "").trim();
+  const curPw = curPwInput?.value || "";
+  const newPw = newPwInput?.value || "";
+  const confirmPw = confirmPwInput?.value || "";
+
+  if (!newId) {
+    newIdInput?.focus();
+    showToast("새 관리자 아이디를 입력해주세요.");
+    return;
+  }
+  if (hashAdminPassword(acc.id, curPw) !== acc.passwordHash) {
+    curPwInput?.focus();
+    showToast("현재 패스워드가 일치하지 않습니다.");
+    return;
+  }
+  if (newPw.length < 4) {
+    newPwInput?.focus();
+    showToast("새 패스워드는 최소 4자 이상으로 입력해주세요.");
+    return;
+  }
+  if (newPw !== confirmPw) {
+    confirmPwInput?.focus();
+    showToast("새 패스워드와 패스워드 확인이 일치하지 않습니다.");
+    return;
+  }
+
+  const nextAccount = {
+    id: newId,
+    passwordHash: hashAdminPassword(newId, newPw),
+    isDefault: false,
+    updatedAt: new Date().toISOString()
+  };
+  state.adminAccount = nextAccount;
+
+  const sessionPayload = JSON.stringify({
+    id: nextAccount.id,
+    passwordHash: nextAccount.passwordHash,
+    loginAt: new Date().toLocaleString("ko-KR")
+  });
+  sessionStorage.setItem(ADMIN_SESSION_KEY, sessionPayload);
+  if (localStorage.getItem(ADMIN_REMEMBER_KEY)) {
+    localStorage.setItem(ADMIN_REMEMBER_KEY, sessionPayload);
+  }
+
+  if (curPwInput) curPwInput.value = "";
+  if (newPwInput) newPwInput.value = "";
+  if (confirmPwInput) confirmPwInput.value = "";
+
+  saveAppState();
+  syncAdminAuthUI();
+  showToast(`관리자 계정이 ‘${newId}’(으)로 변경 저장되었습니다.`);
+});
+
+document.getElementById("admin-logout-btn")?.addEventListener("click", logoutAdmin);
+document.getElementById("admin-logout-card-btn")?.addEventListener("click", logoutAdmin);
+document.getElementById("topbar-admin-logout-btn")?.addEventListener("click", logoutAdmin);
+document.getElementById("public-admin-logout-btn")?.addEventListener("click", logoutAdmin);
+
 const routeTitles = {
   results: "요약 라이브러리",
   input: "새 요약 만들기",
   summary: "You선생 페이지 (상세)",
   templates: "서식 설정",
   view: "You선생 공개페이지",
-  github: "깃허브 등록"
+  github: "깃허브 등록",
+  admin: "관리자 페이지"
 };
 
 function showPage() {
-  const isStaticPublic = document.body.classList.contains("static-public-mode");
+  syncAdminAuthUI();
+  const loggedIn = isAdminLoggedIn();
   const rawHash = window.location.hash.slice(1);
   const [requested, queryStr] = rawHash.split("?");
   if (requested !== "summary" && requested !== "view") {
@@ -6086,11 +6342,20 @@ function showPage() {
       state.currentSummaryId = sharedId;
     }
   }
-  const route = isStaticPublic
-    ? "view"
-    : Object.prototype.hasOwnProperty.call(routeTitles, requested)
-    ? requested
-    : "results";
+
+  let route;
+  if (!loggedIn) {
+    // 비로그인 시: You선생 공개페이지(#view)와 관리자 로그인(#admin)만 노출
+    route = requested === "admin" ? "admin" : "view";
+    if (requested && requested !== "view" && requested !== "admin") {
+      history.replaceState(null, "", "#view");
+    }
+  } else {
+    route = Object.prototype.hasOwnProperty.call(routeTitles, requested)
+      ? requested
+      : "results";
+  }
+
   document.body.classList.toggle("public-route-active", route === "view");
   document.querySelectorAll(".page").forEach((page) => {
     page.hidden = page.id !== route;
@@ -6107,13 +6372,21 @@ function showPage() {
     renderTemplatesUI();
   } else if (route === "github") {
     syncGithubConfigUI();
-  } else if (route === "view" && sharedId !== null) {
+  } else if (route === "admin") {
+    syncAdminAuthUI();
+    if (!loggedIn) {
+      setTimeout(() => document.getElementById("admin-login-id")?.focus(), 50);
+    }
+  } else if (route === "view") {
     renderPublicView();
-    setTimeout(() => openPublicReaderModal(sharedId), 80);
+    if (sharedId !== null) {
+      setTimeout(() => openPublicReaderModal(sharedId), 80);
+    }
   }
   if (serverBaseline && (route === "view" || route === "results")) syncLatestState();
-  document.getElementById("breadcrumb-title").textContent = routeTitles[route];
-  document.title = `${routeTitles[route]} — You선생`;
+  const pageTitle = route === "admin" && !loggedIn ? "관리자 로그인" : routeTitles[route];
+  document.getElementById("breadcrumb-title").textContent = pageTitle;
+  document.title = `${pageTitle} — You선생`;
   window.scrollTo({ top: 0, behavior: "instant" });
 }
 
