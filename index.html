@@ -342,7 +342,7 @@
       </section>
 
       <section id="view" class="page public-page" hidden aria-labelledby="public-title">
-        <div class="public-top"><a class="public-wordmark" href="#view" id="public-title">You선생<span>핵심 요약 라이브러리</span></a><div><a href="#results" class="text-button"><i data-icon="grid"></i>관리자</a><button class="button secondary bookmark-filter"><i data-icon="bookmark"></i>즐겨찾기<span>3</span></button></div></div>
+        <div class="public-top"><a class="public-wordmark" href="#view" id="public-title">You선생<span>핵심 요약 라이브러리</span></a><div><button class="button secondary bookmark-filter"><i data-icon="bookmark"></i>즐겨찾기<span>3</span></button></div></div>
         <div class="public-list-heading" style="margin-top:8px"><h2>전체 요약 목록 <span>23</span></h2><label class="search"><i data-icon="search"></i><input type="search" aria-label="공개 요약 검색" placeholder="제목·채널·내용 검색"></label></div>
         <div class="filter-tabs public-filters" aria-label="공개 목록 분류"></div>
         <div class="public-list"></div>
@@ -497,7 +497,7 @@
     </main>
   </div>
 
-  <dialog id="categories" class="modal"><div class="modal-heading"><div><span class="eyebrow">ORGANIZE YOUR IDEAS</span><h2>내 분류 관리</h2></div><button class="icon-button" data-close aria-label="분류 관리 닫기"><i data-icon="x"></i></button></div><p class="modal-description">나만의 방식으로 지식을 정리하세요. 추가·수정·삭제가 즉시 반영됩니다.</p><div class="category-editor" id="category-editor-list"></div><div class="new-category-field"><input id="new-category-input" placeholder="새 분류 이름 입력" aria-label="새 분류 이름"><button type="button" class="button secondary" id="add-category-btn"><i data-icon="plus"></i>추가</button></div><p class="field-help">분류 삭제 시 해당 요약은 ‘미정’으로 이동해요.</p><div class="modal-footer"><span>변경사항은 자동 저장됩니다.</span><button type="button" class="button primary" data-close>완료</button></div></dialog>
+  <dialog id="categories" class="modal"><div class="modal-heading"><div><span class="eyebrow">ORGANIZE YOUR IDEAS</span><h2>내 분류 관리</h2></div><button class="icon-button" data-close aria-label="분류 관리 닫기"><i data-icon="x"></i></button></div><p class="modal-description">드래그(≡)하거나 위·아래 버튼으로 분류 순서를 변경하세요. 추가·수정·삭제·순서 변경이 즉시 반영됩니다.</p><div class="category-editor" id="category-editor-list"></div><div class="new-category-field"><input id="new-category-input" placeholder="새 분류 이름 입력" aria-label="새 분류 이름"><button type="button" class="button secondary" id="add-category-btn"><i data-icon="plus"></i>추가</button></div><p class="field-help">분류 삭제 시 해당 요약은 ‘미정’으로 이동해요.</p><div class="modal-footer"><span>변경사항은 자동 저장됩니다.</span><button type="button" class="button primary" data-close>완료</button></div></dialog>
   <dialog id="category-picker" class="modal category-picker" aria-labelledby="category-picker-title">
     <div class="modal-heading"><h2 id="category-picker-title">동영상 저장 · 분류 선택</h2><button class="icon-button" data-close aria-label="분류 선택 닫기"><i data-icon="x"></i></button></div>
     <p class="picker-description">영상 <span id="picker-entry-number">1</span> · 여러 분류를 선택할 수 있어요.</p>
@@ -510,27 +510,25 @@
     <div class="picker-footer"><span>체크 후 선택 완료를 눌러주세요.</span><button type="button" class="button" id="apply-category">선택 완료</button></div>
   </dialog>
   <dialog id="share" class="modal share-modal" aria-labelledby="kakao-share-title">
-    <div class="modal-heading"><h2 id="kakao-share-title">카카오톡으로 전송</h2><button class="icon-button" data-close aria-label="카카오톡 전송 창 닫기"><i data-icon="x"></i></button></div>
-    <p class="modal-description">You선생 공개 페이지 주소로 카카오톡 앱을 불러와 전송합니다.</p>
+    <div class="modal-heading"><h2 id="kakao-share-title">카카오톡으로 제목 · 웹페이지 링크 전달</h2><button class="icon-button" data-close aria-label="카카오톡 전송 창 닫기"><i data-icon="x"></i></button></div>
+    <p class="modal-description">요약 게시글의 <strong>제목</strong>과 <strong>웹페이지 바로가기 링크</strong>를 카카오톡으로 전달합니다.</p>
     <div class="kakao-card">
-      <div class="kakao-card-label"><i data-icon="message"></i>You선생 공개 페이지 공유</div>
+      <div class="kakao-card-label"><i data-icon="message"></i>전달할 제목 및 웹페이지 링크</div>
       <h3 id="kakao-video-title">AI 시대, 대체되지 않는 사람이 되는 법</h3>
       <p id="kakao-video-desc">영상 속 핵심을 You선생에서 읽어보세요.</p>
       <div class="kakao-public-url-box">
-        <label class="field-label" for="kakao-public-url-input">You선생 공개 페이지 주소</label>
+        <label class="field-label" for="kakao-public-url-input">전달될 웹페이지 링크 (클릭 시 해당 요약 바로 열림)</label>
         <input id="kakao-public-url-input" class="template-input" readonly>
+      </div>
+      <div class="kakao-public-url-box" style="margin-top:8px">
+        <label class="field-label" for="kakao-share-message-preview">전달 메시지 미리보기 (제목 + 웹 링크)</label>
+        <textarea id="kakao-share-message-preview" class="template-input" rows="3" readonly style="font-size:11px;line-height:1.6;resize:none;background:#fff"></textarea>
       </div>
       <div id="kakao-preview-link-btn" style="cursor:pointer">You선생 공개 페이지에서 바로 보기<i data-icon="arrow-up-right"></i></div>
     </div>
-    <details class="api-key-details" style="margin-top:12px">
-      <summary><i data-icon="settings"></i>Kakao JavaScript 키 설정 (선택사항 · 입력 시 공식 카카오 SDK 공유창 호출)</summary>
-      <div class="api-key-box">
-        <input type="text" id="kakao-js-key-input" class="template-input" placeholder="카카오 개발자 JavaScript 키 입력 (미입력 시 카카오톡 앱/공유창 직접 호출)">
-      </div>
-    </details>
     <div class="modal-footer">
-      <button type="button" class="button secondary" id="kakao-copy-url-btn"><i data-icon="link"></i>공개 주소 복사</button>
-      <button type="button" class="button kakao-button" id="kakao-send-btn"><i data-icon="message"></i>카카오톡 불러와서 전송</button>
+      <button type="button" class="button secondary" id="kakao-copy-url-btn"><i data-icon="link"></i>제목 + 웹 링크 복사</button>
+      <button type="button" class="button kakao-button" id="kakao-send-btn"><i data-icon="message"></i>카카오톡으로 제목 · 링크 전달</button>
     </div>
   </dialog>
   <dialog id="template-add" class="modal" aria-labelledby="template-add-title">
@@ -629,7 +627,6 @@
     <div class="reader-modal-top">
       <div class="detail-badges" style="margin:0">
         <span class="tag tag-sage" id="reader-category-badge">1. 기도</span>
-        <button type="button" class="button secondary" id="reader-category-edit-btn" style="min-height:26px;padding:3px 8px;font-size:10.5px"><i data-icon="bookmark"></i>분류 수정</button>
         <span class="public-date" id="reader-date">2026.10.17</span>
         <span class="public-date" id="reader-channel">채널명</span>
       </div>
@@ -638,9 +635,35 @@
         <button type="button" class="button secondary" id="reader-bookmark-btn" style="min-height:32px;padding:6px 10px;font-size:11px"><i data-icon="bookmark"></i>즐겨찾기</button>
         <button type="button" class="button kakao-button" id="reader-kakao-btn" style="min-height:32px;padding:6px 10px;font-size:11px"><i data-icon="message"></i>카톡 공유</button>
         <a id="reader-youtube-link" href="https://www.youtube.com/" target="_blank" rel="noopener noreferrer" class="button secondary" style="min-height:32px;padding:6px 10px;font-size:11px"><i data-icon="youtube"></i>원본 영상</a>
-        <button type="button" class="button secondary" id="reader-admin-edit-btn" style="min-height:32px;padding:6px 10px;font-size:11px"><i data-icon="edit"></i>관리자 편집</button>
         <button type="button" class="icon-button" data-close aria-label="리더 모달 닫기"><i data-icon="x"></i></button>
       </div>
+    </div>
+    <div class="tts-player-bar" id="reader-tts-player-bar" hidden style="margin:12px 0 6px;padding:10px 14px">
+      <div class="tts-player-main">
+        <span class="tts-badge"><i data-icon="volume"></i>TTS 음성 낭독</span>
+        <button type="button" class="tts-ctrl-btn" id="reader-tts-prev-btn" title="이전 문장"><i data-icon="chevron-left"></i></button>
+        <button type="button" class="tts-ctrl-btn primary" id="reader-tts-play-pause-btn" title="재생 / 일시정지"><i data-icon="pause"></i><span>일시정지</span></button>
+        <button type="button" class="tts-ctrl-btn" id="reader-tts-next-btn" title="다음 문장"><i data-icon="chevron-right"></i></button>
+        <button type="button" class="tts-ctrl-btn danger" id="reader-tts-stop-btn" title="낭독 정지"><i data-icon="stop"></i><span>정지</span></button>
+        <span class="tts-progress-text" id="reader-tts-progress-text">구간 1 / 10</span>
+      </div>
+      <div class="tts-player-options">
+        <label for="reader-tts-scope-select">낭독 범위</label>
+        <select id="reader-tts-scope-select">
+          <option value="all" selected>전체 ([1] 요약 + [2] 핵심)</option>
+          <option value="summary">[1] 요약 본문만</option>
+          <option value="keypoints">[2] 핵심 요점만</option>
+        </select>
+        <label for="reader-tts-rate-select">배속</label>
+        <select id="reader-tts-rate-select">
+          <option value="0.85">0.85x (차분하게)</option>
+          <option value="1" selected>1.0x (보통)</option>
+          <option value="1.2">1.2x (조금 빠르게)</option>
+          <option value="1.4">1.4x (빠르게)</option>
+          <option value="1.6">1.6x (매우 빠르게)</option>
+        </select>
+      </div>
+      <div class="tts-current-sentence" id="reader-tts-current-sentence">문단을 클릭하거나 상단 컨트롤로 낭독을 제어하세요.</div>
     </div>
     <h2 id="reader-modal-title" class="reader-title">요약 제목</h2>
     <div class="reader-body-scroll">
