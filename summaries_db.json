@@ -175,87 +175,6 @@
   ],
   "summaries": [
     {
-      "id": 46,
-      "uid": "c1179d41-7db7-4c12-b806-9c99149d396b",
-      "title": "유튜브 핵심 인사이트 분석 (IqmK7suNZDo)",
-      "channel": "YouTube 크리에이터",
-      "url": "https://www.youtube.com/shorts/IqmK7suNZDo",
-      "categories": [
-        "미정"
-      ],
-      "date": "2026.10.31",
-      "ratio": 70,
-      "template": "자유",
-      "aiModel": "Gemini API (gemini-3.5-flash-lite (웹 유튜브 직접 AI 요약))",
-      "quality": {
-        "method": "web-youtube-direct-ai",
-        "sourceChars": 412,
-        "notice": "웹 브라우저에서 Gemini AI가 유튜브 영상을 직접 분석하여 생성한 요약본입니다."
-      },
-      "isNew": true,
-      "published": true,
-      "bookmarked": false,
-      "excerpt": "하나님께서는 자신의 백성을 상처투성이인 채로 결코 이끌어내지 않으십니다. 절망에 빠진 상태나 심하게 맞아 다음 일을 감당할 힘조차 없는 상태로 방치하지 않으시며, 인도하실 때는 반드시 온전한 회복을 함께 주",
-      "scriptSegments": [
-        {
-          "start": 0,
-          "time": "00:00",
-          "duration": 15,
-          "text": "회복 없는 출애굽은 있을 수 없습니다. 하나님께서는 자신의 백성을 상처투성이인 채로 이끌어내지 않으셨습니다."
-        },
-        {
-          "start": 15,
-          "time": "00:09",
-          "duration": 15,
-          "text": "절망에 빠진 상태로 내버려둔 채 이끌어내시지도 않으셨습니다. 너무나 심하게 맞고 상처 입어서 다음 일을 감당할 힘조차 없는 상태로 이끌어내시지도 않습니다."
-        },
-        {
-          "start": 30,
-          "time": "00:22",
-          "duration": 15,
-          "text": "하나님께서 여러분을 이끌어내실 때는 온전한 회복이 뒤따를 것입니다. 여러분은 이제 완전한 회복을 경험하게 될 것입니다."
-        },
-        {
-          "start": 45,
-          "time": "00:31",
-          "duration": 15,
-          "text": "그러므로 하나님께서 여러분에게 주셨던 꿈을 다시 꺼내 먼지를 털어내십시오. 몇 년 전에 주님께서 여러분에게 말씀하셨던 말씀을 다시 붙잡으십시오."
-        },
-        {
-          "start": 60,
-          "time": "00:43",
-          "duration": 15,
-          "text": "과거로 돌아가 보십시오. 7년 전이든 20년 전이든 필요한 만큼 거슬러 올라가십시오."
-        },
-        {
-          "start": 75,
-          "time": "00:50",
-          "duration": 15,
-          "text": "성령님께서 여러분의 생각과 마음에 두셨던 것을 다시 찾아내십시오. 그리고 하나님께서 이제 그것들을 다시 깨우실 거라고 선포하십시오."
-        }
-      ],
-      "originalHtml": "<div class=\"hanaro-section-head\"><span class=\"hanaro-num-badge\">1</span><h2>요약 (자유형식)</h2></div><h1 class=\"hanaro-doc-title\">유튜브 핵심 인사이트 분석 (IqmK7suNZDo)</h1><h2 class=\"hanaro-h2-major\">1. 출애굽의 진정한 의미와 상처 치유</h2><h3 class=\"hanaro-h3\">회복 없는 출애굽은 없다</h3><p class=\"hanaro-p\">하나님께서는 자신의 백성을 상처투성이인 채로 결코 이끌어내지 않으십니다. 절망에 빠진 상태나 심하게 맞아 다음 일을 감당할 힘조차 없는 상태로 방치하지 않으시며, 인도하실 때는 반드시 온전한 회복을 함께 주십니다. 따라서 우리는 하나님 안에서 완벽한 회복과 치유를 경험하게 될 것을 믿고 나아가야 합니다.</p><h2 class=\"hanaro-h2-major\">2. 잃어버린 꿈과 비전의 재발견</h2><h3 class=\"hanaro-h3\">과거 주셨던 약속과 꿈을 다시 붙잡으라</h3><p class=\"hanaro-p\">하나님께서 과거에 우리에게 주셨던 꿈을 다시 꺼내어 먼지를 털어내야 합니다. 7년 전이든 20년 전이든 필요한 만큼 과거로 거슬러 올라가 성령님께서 생각과 마음에 두셨던 약속을 다시 찾아내십시오. 하나님께서 이제 그것들을 다시 깨우시고 성취하실 것을 확신하며 선포해야 합니다.</p>",
-      "editedHtml": "<div class=\"hanaro-section-head\"><span class=\"hanaro-num-badge\">1</span><h2>요약 (자유형식)</h2></div><h1 class=\"hanaro-doc-title\">유튜브 핵심 인사이트 분석 (IqmK7suNZDo)</h1><h2 class=\"hanaro-h2-major\">1. 출애굽의 진정한 의미와 상처 치유</h2><h3 class=\"hanaro-h3\">회복 없는 출애굽은 없다</h3><p class=\"hanaro-p\">하나님께서는 자신의 백성을 상처투성이인 채로 결코 이끌어내지 않으십니다. 절망에 빠진 상태나 심하게 맞아 다음 일을 감당할 힘조차 없는 상태로 방치하지 않으시며, 인도하실 때는 반드시 온전한 회복을 함께 주십니다. 따라서 우리는 하나님 안에서 완벽한 회복과 치유를 경험하게 될 것을 믿고 나아가야 합니다.</p><h2 class=\"hanaro-h2-major\">2. 잃어버린 꿈과 비전의 재발견</h2><h3 class=\"hanaro-h3\">과거 주셨던 약속과 꿈을 다시 붙잡으라</h3><p class=\"hanaro-p\">하나님께서 과거에 우리에게 주셨던 꿈을 다시 꺼내어 먼지를 털어내야 합니다. 7년 전이든 20년 전이든 필요한 만큼 과거로 거슬러 올라가 성령님께서 생각과 마음에 두셨던 약속을 다시 찾아내십시오. 하나님께서 이제 그것들을 다시 깨우시고 성취하실 것을 확신하며 선포해야 합니다.</p>",
-      "takeaways": [
-        "**회복 없는 출애굽 (하나님의 돌보심)**\n상처입은 백성을 방치하지 않으시는 하나님의 **온전한 회복** 약속",
-        "**절망 속 인도 (힘을 주시는 은혜)**\n감당할 힘조차 없는 자를 버려두지 않고 **새 힘**을 공급하시는 은혜",
-        "**완벽한 회복 (치유와 회복)**\n우리의 상처를 치유하시고 뒤따르게 하시는 **완전한 회복**의 축복",
-        "**꿈의 재발견 (비전의 회복)**\n과거에 주셨던 비전의 먼지를 털어내고 **꿈**을 다시 붙잡는 결단",
-        "**과거의 약속 (기억하시는 하나님)**\n7년 전이든 20년 전이든 과거로 거슬러 올라가 **말씀**을 붙잡는 태도",
-        "**성령의 인도 (마음의 감동)**\n생각과 마음에 두셨던 소중한 것들을 **성령님**을 통해 다시 찾는 과정",
-        "**새로운 시작 (부활과 깨움)**\n하나님께서 멈춰 있던 것들을 다시 **깨우실 것**이라는 확신과 선포",
-        "**믿음의 선포 (하나님의 역사)**\n우리의 입술로 하나님의 일하심을 믿고 **선포**하는 믿음의 능력",
-        "**출애굽의 기적 (가장 큰 기적)**\n단순한 탈출을 넘어 온전한 치유를 동반하는 **출애굽**의 참된 의미",
-        "**하나님의 사랑 (인도하심)**\n상처 입은 영혼을 치유하시며 이끄시는 **아버지의 사랑**",
-        "**마음의 먼지 (묵은 땅을 갈아엎음)**\n오랫동안 잊고 지냈던 소망의 먼지를 털어내는 **정화**의 시간",
-        "**비전 성취 (하나님의 때)**\n약속하셨던 바를 반드시 이루시는 하나님의 **신실하심**"
-      ],
-      "outline": [
-        "출애굽의 진정한 의미와 상처 치유",
-        "잃어버린 꿈과 비전의 재발견"
-      ]
-    },
-    {
       "aiModel": "Gemini API (gemini-flash-lite-latest)",
       "bookmarked": false,
       "categories": [
@@ -179187,7 +179106,7 @@
     },
     {
       "aiModel": "OpenAI GPT-4o",
-      "bookmarked": false,
+      "bookmarked": true,
       "categories": [
         "기도"
       ],
@@ -184972,7 +184891,7 @@
     "subpath": "",
     "username": "daehann-svg"
   },
-  "selectedAiModel": "free-openai",
+  "selectedAiModel": "free-gemini",
   "apiKey": "",
   "modelApiKeys": {
     "free-gemini": "",
@@ -185010,6 +184929,6 @@
     "passwordHash": "0759283cf5224e4c",
     "updatedAt": "2026-10-31T12:10:52.287Z"
   },
-  "encryptedAdminVault": "137d5b6d9189ddf24e7c020aa2ebf7ec4d5f07590ea48df9d4315f373392e6acfd57364d3089d8c8d8440c0e4ec9a6f3e11a353f5d70879afad40b1b3e6e94c992b8402a4c32def1bda15c55137e96b5c9a9e91d7b5a67d8abceef11285c34c6f4bcc841194227f591cf943e13674eabc9a199f84842573d80bb8af36636623ebaf8e4a3081d4b70a3a9c7ea1904604e9d8dd4c4fa6778123697ab89a00e691b26c6fdc4a9033b390cc3d2c7a43918075db7be91fcd52e465e2a8e9695ad1f660326aaf5f0fa792b3a65c8d093be2b201a397cfc9ab1e83a104132a2f98bb0012c542d9ca994e01b695738d5f082b4490e2b4108cabdbb8c1c126811e9c2a0c57422056db4ebcafe1f211549d4ddcdcb450873054fc3e8f0f91b350919e6dd9791647b4b4fc8e3d4f95b2b066e88aee3fd1e14231e23d7ba9ce129727737f9bdb2b33b0146508ea0bf865f6a1a248797d1bcfa1f7c7f3acff684d13376596bd1a9",
-  "_revision": 70
+  "encryptedAdminVault": "137d5b6d9189ddf24e7c0069b29498cf17351b2171b486e5de324a3413d0b98c851738523dd6aebfba683c773bb5e8c1cb1d17105775ddfdeecf22322144cebef1b64e67013bd4f999bd746e1f4c80ee80f0f15b721d6487a9ceaf1f23587f92bfdfa34f7a614e899e9be5350f1f43b5c9beac8c765f127a9692d6b05d655e71b3fff4e3366861219e89c7e863364c7cdc82d0f1bc7f1c5222b0fbc0e501601926cdb1c2fb5c771934cfa985be2a071f558cd48df6a4354e7d57a69df3881430075ddfb7dee7592d3f6beaecb5e6247c021623c3938cf608677b46baabfed41b697660d4ec9bf10d675132d9e9c7eb062614067d8abfc9e06b0a1f02c5beb5d9131a6f53b69bf9d62b381164aebdc1f911247c323df9f9f3ac31664e0bcaedacac4c7c4c58a8c788827a2e4447dfb19bb2571624487180bfa0e11d26572284e4c2ad06257f34aba7bea660662217d694cce58b75644c2281f7e1f40c770975b5a188be10087b2885b6c7ec",
+  "_revision": 63
 }
