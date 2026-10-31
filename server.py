@@ -1356,6 +1356,16 @@ def api_github_device_poll():
         return jsonify({"ok": False, "error": f"깃허브 토큰 확인 오류: {e}"}), 502
 
 
+def xor_vault_crypt_hex(text_str: str, key_str: str) -> str:
+    data = text_str.encode("utf-8")
+    key = key_str.encode("utf-8")
+    out = bytearray(len(data))
+    for i, b in enumerate(data):
+        k = key[i % len(key)] ^ ((i * 31 + 17) & 0xFF)
+        out[i] = b ^ k
+    return out.hex()
+
+
 def build_sanitized_public_db_bytes() -> bytes:
     with STATE_LOCK:
         if not os.path.exists(DB_FILE_PATH):
@@ -1363,6 +1373,22 @@ def build_sanitized_public_db_bytes() -> bytes:
         with open(DB_FILE_PATH, "r", encoding="utf-8") as f:
             data = json.load(f)
     sanitized = dict(data) if isinstance(data, dict) else {"summaries": []}
+
+    # Encrypt admin API keys & GitHub token into encryptedAdminVault so web admin login unlocks them automatically
+    adm = sanitized.get("adminAccount") if isinstance(sanitized.get("adminAccount"), dict) else {}
+    adm_id = str(adm.get("id") or "admin").strip()
+    adm_hash = str(adm.get("passwordHash") or "8a20cc1a981459d7").strip()
+    vault_payload = {
+        "apiKey": str(sanitized.get("apiKey") or ""),
+        "modelApiKeys": dict(sanitized.get("modelApiKeys") or {}) if isinstance(sanitized.get("modelApiKeys"), dict) else {},
+        "githubToken": str(LAST_ACCESS_TOKEN or ""),
+    }
+    if vault_payload["apiKey"] or any(vault_payload["modelApiKeys"].values()) or vault_payload["githubToken"]:
+        key_str = f"yousunsaeng-vault-v1:{adm_id}:{adm_hash}"
+        sanitized["encryptedAdminVault"] = xor_vault_crypt_hex(
+            json.dumps(vault_payload, ensure_ascii=False), key_str
+        )
+
     sanitized["apiKey"] = ""
     sanitized["kakaoJsKey"] = ""
     if isinstance(sanitized.get("modelApiKeys"), dict):
