@@ -42,6 +42,7 @@
       <div class="breadcrumb"><span>You선생</span><i data-icon="chevron-right"></i><strong id="breadcrumb-title">You선생 공개페이지</strong></div>
       <div class="topbar-right">
         <small id="persistence-status" role="status" data-admin-only>서버 연결 확인 중…</small>
+        <button type="button" class="button secondary" id="topbar-api-key-btn" data-open="api-key-modal" data-admin-only title="AI API 키 및 GitHub 클라우드 저장 토큰 조회·수정"><i data-icon="sparkles"></i>API 키 수정</button>
         <button type="button" class="button secondary" id="retry-save-btn" data-admin-only>저장 재시도</button>
         <button type="button" class="button secondary" id="recovery-export-btn" hidden>미저장본 백업</button>
         <button type="button" class="button secondary" id="recovery-discard-btn" hidden>최신 서버본 선택</button>
@@ -144,7 +145,14 @@
             </div>
 
             <div class="form-card ai-settings-card">
-              <div class="card-heading"><span class="step-number">02</span><div><h2>사용할 AI 모델 선택</h2><p>키 입력 후 [연결]로 실제 생성 응답을 확인하세요. 사용 모델·할당량에 따라 비용이 발생할 수 있습니다.</p></div><i data-icon="sparkles"></i></div>
+              <div class="card-heading">
+                <span class="step-number">02</span>
+                <div>
+                  <h2>사용할 AI 모델 선택 및 웹/서버 API 키 등록</h2>
+                  <p>로컬 서버뿐만 아니라 웹(GitHub Pages)에서도 아래 AI Key를 입력·저장하면 유튜브 영상과 원고를 즉시 AI로 요약합니다.</p>
+                </div>
+                <button type="button" class="button secondary" data-open="api-key-modal" style="margin-left:auto;min-height:36px;padding:6px 12px;font-size:11.5px"><i data-icon="edit"></i>API 키 통합 수정</button>
+              </div>
               <div class="ai-model-grid ai-model-grid-3" role="radiogroup" aria-label="사용할 AI 선택">
                 <div class="ai-model-option" data-model-card="vscode-gemini4">
                   <label class="ai-model-select-area">
@@ -153,36 +161,42 @@
                     <p>API 키로 연결합니다. VS Code 계정(<span id="ai-card-account-name">지식 수집가</span>) 로그인과 별개입니다.</p>
                   </label>
                   <div class="ai-model-api-row">
-                    <input type="password" class="template-input ai-model-key-input" data-model-key="vscode-gemini4" placeholder="Gemini API Key 입력" autocomplete="off">
-                    <button type="button" class="button secondary ai-connect-btn" data-connect-model="vscode-gemini4">연결</button>
+                    <input type="password" class="template-input ai-model-key-input" data-model-key="vscode-gemini4" placeholder="Gemini API Key 입력 (AIza...)" autocomplete="off">
+                    <button type="button" class="button secondary ai-key-vis-btn" data-toggle-key-vis="vscode-gemini4" style="min-height:35px;padding:6px 9px;font-size:10.5px">표시</button>
+                    <button type="button" class="button primary ai-save-key-btn" data-save-model-key="vscode-gemini4" style="min-height:35px;padding:6px 10px;font-size:10.5px">키 저장</button>
+                    <button type="button" class="button secondary ai-connect-btn" data-connect-model="vscode-gemini4">연결 확인</button>
                   </div>
-                  <div class="ai-conn-status" data-conn-status="vscode-gemini4">미확인 · 연결 버튼을 눌러 주세요.</div>
+                  <div class="ai-conn-status" data-conn-status="vscode-gemini4">미확인 · 키 입력 후 [키 저장] 또는 [연결 확인]을 눌러 주세요.</div>
                 </div>
 
                 <div class="ai-model-option active" data-model-card="free-gemini">
                   <label class="ai-model-select-area">
                     <input type="radio" name="ai-model" value="free-gemini" checked>
-                    <div class="ai-model-head"><strong>Gemini API</strong><span class="tag tag-blue">연결 확인 필요</span></div>
-                    <p>Google AI Studio 무료 티어 API Key로 긴 유튜브 스크립트 실제 생성 요약</p>
+                    <div class="ai-model-head"><strong>Gemini API (웹 · 서버 권장)</strong><span class="tag tag-blue">웹 요약 지원</span></div>
+                    <p>Google AI Studio API Key로 로컬·웹 어디서나 유튜브 영상 및 스크립트 실제 생성 요약</p>
                   </label>
                   <div class="ai-model-api-row">
-                    <input type="password" class="template-input ai-model-key-input" data-model-key="free-gemini" placeholder="Gemini API Key 입력" autocomplete="off">
-                    <button type="button" class="button secondary ai-connect-btn" data-connect-model="free-gemini">연결</button>
+                    <input type="password" class="template-input ai-model-key-input" data-model-key="free-gemini" placeholder="Gemini API Key 입력 (AIza...)" autocomplete="off">
+                    <button type="button" class="button secondary ai-key-vis-btn" data-toggle-key-vis="free-gemini" style="min-height:35px;padding:6px 9px;font-size:10.5px">표시</button>
+                    <button type="button" class="button primary ai-save-key-btn" data-save-model-key="free-gemini" style="min-height:35px;padding:6px 10px;font-size:10.5px">키 저장</button>
+                    <button type="button" class="button secondary ai-connect-btn" data-connect-model="free-gemini">연결 확인</button>
                   </div>
-                  <div class="ai-conn-status" data-conn-status="free-gemini">미확인 · 연결 버튼을 눌러 주세요.</div>
+                  <div class="ai-conn-status" data-conn-status="free-gemini">미확인 · 키 입력 후 [키 저장] 또는 [연결 확인]을 눌러 주세요.</div>
                 </div>
 
                 <div class="ai-model-option" data-model-card="free-openai">
                   <label class="ai-model-select-area">
                     <input type="radio" name="ai-model" value="free-openai">
-                    <div class="ai-model-head"><strong>OpenAI (GPT-4o mini)</strong><span class="tag tag-sage">연결 확인 필요</span></div>
-                    <p>OpenAI API 키가 필요합니다. Gemini 키와 호환되지 않습니다.</p>
+                    <div class="ai-model-head"><strong>OpenAI (GPT-4o mini)</strong><span class="tag tag-sage">웹 요약 지원</span></div>
+                    <p>OpenAI API 키(sk-...) 또는 GitHub 토큰(ghp_...)으로 웹·서버 요약 생성</p>
                   </label>
                   <div class="ai-model-api-row">
                     <input type="password" class="template-input ai-model-key-input" data-model-key="free-openai" placeholder="OpenAI API Key 입력 (sk-...)" autocomplete="off">
-                    <button type="button" class="button secondary ai-connect-btn" data-connect-model="free-openai">연결</button>
+                    <button type="button" class="button secondary ai-key-vis-btn" data-toggle-key-vis="free-openai" style="min-height:35px;padding:6px 9px;font-size:10.5px">표시</button>
+                    <button type="button" class="button primary ai-save-key-btn" data-save-model-key="free-openai" style="min-height:35px;padding:6px 10px;font-size:10.5px">키 저장</button>
+                    <button type="button" class="button secondary ai-connect-btn" data-connect-model="free-openai">연결 확인</button>
                   </div>
-                  <div class="ai-conn-status" data-conn-status="free-openai">미확인 · 연결 버튼을 눌러 주세요.</div>
+                  <div class="ai-conn-status" data-conn-status="free-openai">미확인 · 키 입력 후 [키 저장] 또는 [연결 확인]을 눌러 주세요.</div>
                 </div>
               </div>
             </div>
@@ -621,9 +635,63 @@
                 </form>
               </div>
 
-              <div class="form-card">
+              <div class="form-card" id="admin-api-keys-card">
                 <div class="card-heading">
                   <span class="step-number">03</span>
+                  <div>
+                    <h2>AI API 키 · GitHub 토큰 조회 및 수정 (웹 · 로컬 공통)</h2>
+                    <p>현재 등록된 AI 요약용 API Key와 GitHub 클라우드 저장 토큰을 확인(표시)·수정합니다. 웹에서도 여기에 AI Key를 등록하면 즉시 요약 만들기가 작동합니다.</p>
+                  </div>
+                  <i data-icon="sparkles"></i>
+                </div>
+                <form id="admin-api-keys-form" autocomplete="off">
+                  <div class="algo-form-grid" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px">
+                    <div>
+                      <label class="field-label" for="admin-key-free-gemini">Gemini API Key (무료/표준 · 웹 요약 권장) <span>*</span></label>
+                      <div style="display:flex;gap:6px;align-items:center">
+                        <input type="password" id="admin-key-free-gemini" class="template-input" placeholder="AIza... 또는 AQ...." style="flex:1">
+                        <button type="button" class="button secondary" data-admin-key-toggle="admin-key-free-gemini" style="min-height:38px;padding:6px 10px;font-size:11px">표시</button>
+                        <button type="button" class="button secondary" data-admin-key-test="free-gemini" style="min-height:38px;padding:6px 10px;font-size:11px">테스트</button>
+                      </div>
+                    </div>
+                    <div>
+                      <label class="field-label" for="admin-key-vscode-gemini4">Gemini API Key (VS Code 설정 연동)</label>
+                      <div style="display:flex;gap:6px;align-items:center">
+                        <input type="password" id="admin-key-vscode-gemini4" class="template-input" placeholder="AIza... (비워두면 위 Gemini 키 자동 사용)" style="flex:1">
+                        <button type="button" class="button secondary" data-admin-key-toggle="admin-key-vscode-gemini4" style="min-height:38px;padding:6px 10px;font-size:11px">표시</button>
+                        <button type="button" class="button secondary" data-admin-key-test="vscode-gemini4" style="min-height:38px;padding:6px 10px;font-size:11px">테스트</button>
+                      </div>
+                    </div>
+                    <div>
+                      <label class="field-label" for="admin-key-free-openai">OpenAI / GitHub Models API Key (선택)</label>
+                      <div style="display:flex;gap:6px;align-items:center">
+                        <input type="password" id="admin-key-free-openai" class="template-input" placeholder="sk-... 또는 ghp_..." style="flex:1">
+                        <button type="button" class="button secondary" data-admin-key-toggle="admin-key-free-openai" style="min-height:38px;padding:6px 10px;font-size:11px">표시</button>
+                        <button type="button" class="button secondary" data-admin-key-test="free-openai" style="min-height:38px;padding:6px 10px;font-size:11px">테스트</button>
+                      </div>
+                    </div>
+                    <div>
+                      <label class="field-label" for="admin-key-github-pat">GitHub 클라우드 자동저장 토큰 (PAT)</label>
+                      <div style="display:flex;gap:6px;align-items:center">
+                        <input type="password" id="admin-key-github-pat" class="template-input" placeholder="gho_... / ghp_... (웹에서 요약본 영구 저장용)" style="flex:1">
+                        <button type="button" class="button secondary" data-admin-key-toggle="admin-key-github-pat" style="min-height:38px;padding:6px 10px;font-size:11px">표시</button>
+                      </div>
+                    </div>
+                  </div>
+                  <div id="admin-api-key-status-msg" class="ai-conn-status" style="margin-top:12px">현재 등록된 API 키를 확인하거나 새 키를 입력한 뒤 [API 키 전체 저장]을 눌러주세요.</div>
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)">
+                    <span class="field-help" style="margin:0"><i data-icon="info"></i>저장된 API 키는 관리자 암호화 볼트(<code>encryptedAdminVault</code>)에 보호되어 웹에서도 관리자 로그인 시 자동 연동됩니다.</span>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap">
+                      <button type="button" class="button secondary" id="admin-toggle-all-keys-btn">전체 키 표시/숨김</button>
+                      <button type="submit" class="button primary" id="admin-save-api-keys-btn"><i data-icon="check-circle"></i>API 키 수정 저장</button>
+                    </div>
+                  </div>
+                </form>
+              </div>
+
+              <div class="form-card">
+                <div class="card-heading">
+                  <span class="step-number">04</span>
                   <div>
                     <h2>관리자 워크스페이스 바로가기</h2>
                     <p>You선생의 요약 콘텐츠 생성, 분류, 서식, 깃허브 배포 메뉴로 바로 이동할 수 있습니다.</p>
@@ -851,6 +919,51 @@
       <div class="article-content" id="reader-article-content" style="padding:18px 4px"></div>
       <div class="article-summary" style="margin:10px 0 0"><div class="summary-box-heading"><span class="hanaro-num-badge amber">2</span><h3>핵심</h3><span>KEY POINTS</span></div><ol class="hanaro-keypoints-list" id="reader-takeaways"></ol></div>
     </div>
+  </dialog>
+  <dialog id="api-key-modal" class="modal" aria-labelledby="api-key-modal-title">
+    <div class="modal-heading">
+      <div><span class="eyebrow">AI &amp; CLOUD API KEY MANAGER</span><h2 id="api-key-modal-title">API 키 조회 · 수정 등록</h2></div>
+      <button class="icon-button" data-close aria-label="API 키 설정 닫기"><i data-icon="x"></i></button></div>
+    <p class="modal-description">로컬 서버와 웹(GitHub Pages) 어디서나 요약 만들기가 가능하도록 AI API Key를 등록·수정합니다.</p>
+    <form id="modal-api-keys-form" autocomplete="off">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div>
+          <label class="field-label" for="modal-key-free-gemini">1. Gemini API Key (웹 · 서버 요약 기본 키) <span>*</span></label>
+          <div style="display:flex;gap:6px">
+            <input type="password" id="modal-key-free-gemini" class="template-input" placeholder="AIza... 또는 AQ...." style="flex:1">
+            <button type="button" class="button secondary" data-admin-key-toggle="modal-key-free-gemini" style="min-height:38px;padding:6px 10px;font-size:11px">표시</button>
+            <button type="button" class="button secondary" data-modal-key-test="free-gemini" style="min-height:38px;padding:6px 10px;font-size:11px">연결 확인</button>
+          </div>
+        </div>
+        <div>
+          <label class="field-label" for="modal-key-vscode-gemini4">2. Gemini API Key (VS Code 설정 연동)</label>
+          <div style="display:flex;gap:6px">
+            <input type="password" id="modal-key-vscode-gemini4" class="template-input" placeholder="AIza... (비워두면 1번 키 자동 사용)" style="flex:1">
+            <button type="button" class="button secondary" data-admin-key-toggle="modal-key-vscode-gemini4" style="min-height:38px;padding:6px 10px;font-size:11px">표시</button>
+          </div>
+        </div>
+        <div>
+          <label class="field-label" for="modal-key-free-openai">3. OpenAI / GitHub Models API Key (선택)</label>
+          <div style="display:flex;gap:6px">
+            <input type="password" id="modal-key-free-openai" class="template-input" placeholder="sk-... 또는 ghp_..." style="flex:1">
+            <button type="button" class="button secondary" data-admin-key-toggle="modal-key-free-openai" style="min-height:38px;padding:6px 10px;font-size:11px">표시</button>
+            <button type="button" class="button secondary" data-modal-key-test="free-openai" style="min-height:38px;padding:6px 10px;font-size:11px">연결 확인</button>
+          </div>
+        </div>
+        <div>
+          <label class="field-label" for="modal-key-github-pat">4. GitHub 클라우드 저장 토큰 (PAT · 웹 영구 저장용)</label>
+          <div style="display:flex;gap:6px">
+            <input type="password" id="modal-key-github-pat" class="template-input" placeholder="gho_... / ghp_..." style="flex:1">
+            <button type="button" class="button secondary" data-admin-key-toggle="modal-key-github-pat" style="min-height:38px;padding:6px 10px;font-size:11px">표시</button>
+          </div>
+        </div>
+      </div>
+      <div id="modal-api-key-status" class="ai-conn-status" style="margin-top:12px">키를 입력하고 [API 키 저장]을 누르면 즉시 웹·서버 요약에 반영됩니다.</div>
+      <div class="modal-footer" style="margin-top:16px">
+        <button type="button" class="button secondary" data-close>닫기</button>
+        <button type="submit" class="button primary" id="modal-save-api-keys-btn"><i data-icon="check-circle"></i>API 키 저장</button>
+      </div>
+    </form>
   </dialog>
   <dialog id="vscode-account" class="modal" aria-labelledby="vscode-account-title">
     <div class="modal-heading">
