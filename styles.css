@@ -204,3 +204,37 @@ mark.script-hl{background:#fef08a;color:#1e293b;padding:0 2px;border-radius:3px}
   .topbar-divider { display: none; }
   .progress-actions, .progress-actions > div { flex-wrap: wrap; gap: 8px; }
 }
+
+/* Drag-and-drop category ordering & Web/Mobile Public Read-Only Optimization */
+.cat-drag-grip { cursor: grab; color: #9aa692; font-size: 11px; letter-spacing: -1px; margin-right: 2px; user-select: none; }
+[data-cat-idx] { cursor: grab; transition: background .15s, transform .15s, box-shadow .15s; }
+[data-cat-idx]:active { cursor: grabbing; }
+.cat-dragging { opacity: 0.45; background: #eef4ea !important; }
+.cat-drag-over { box-shadow: inset 0 2px 0 #284e40 !important; background: #f2f7ee !important; }
+
+body.static-public-mode .sidebar,
+body.static-public-mode .topbar { display: none !important; }
+body.static-public-mode .app-shell { margin-left: 0 !important; }
+body.static-public-mode main { max-width: 1020px; padding: 28px 22px 44px; }
+
+.public-page .public-item { padding: 22px 10px; border-radius: 9px; transition: background .15s; }
+.public-page .public-item:hover { background: #fbfcf9; }
+.public-page .public-item h3 { font-size: 17px; font-weight: 680; line-height: 1.5; color: #1e3529; }
+.public-page .public-item p { font-size: 12.5px; line-height: 1.75; color: #546650; }
+.reader-modal { width: 880px; max-width: calc(100% - 20px); max-height: calc(100vh - 28px); padding: 22px 26px; }
+.reader-body-scroll .article-content { font-size: 15px; line-height: 1.9; color: #22352b; }
+.reader-body-scroll .hanaro-keypoints-list { font-size: 14px; line-height: 1.8; }
+
+@media (max-width: 740px) {
+  body.static-public-mode main { padding: 18px 14px 36px; }
+  .public-page .public-item { flex-direction: column; align-items: flex-start; gap: 12px; padding: 18px 6px; }
+  .public-page .public-number { font-size: 16px; min-width: auto; margin-top: 0; }
+  .public-page .public-item h3 { font-size: 15.5px; margin: 6px 0; padding-right: 0; }
+  .public-page .public-item p { font-size: 12px; line-height: 1.7; }
+  .public-page .public-item-actions { width: 100%; justify-content: flex-end; gap: 10px; padding-top: 4px; }
+  .reader-modal { width: calc(100% - 12px); max-width: calc(100% - 12px); max-height: calc(100vh - 16px); padding: 16px 14px; border-radius: 11px; }
+  .reader-title { font-size: 18.5px; margin: 12px 0; }
+  .reader-body-scroll { max-height: calc(100vh - 185px); }
+  .reader-body-scroll .article-content { font-size: 14px; line-height: 1.85; padding: 12px 2px !important; }
+}
+
