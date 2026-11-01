@@ -1422,7 +1422,7 @@ async function runSummarizationAlgorithm(segments, title, channel, ratio, templa
   if (!Array.isArray(segments) || !segments.some((s) => String(s.text || "").trim())) {
     throw new Error("원문이 없습니다. 자막·직접 입력 원고·오디오가 필요합니다.");
   }
-  // Structured manuscripts can be preserved without an external AI request.
+  // Structured manuscripts can be preserved without an external AI request only when no custom concept/command is given.
   if (!extraClean) {
     const exhaustiveLocal = parseExhaustiveMarkdownInBrowser(segments, title, tplObj.name || templateName);
     if (exhaustiveLocal) {
@@ -1432,9 +1432,15 @@ async function runSummarizationAlgorithm(segments, title, channel, ratio, templa
     }
   }
 
+  // Ignore stale recipe-specific rules on non-recipe videos so general sermon/lecture resummarization does not conflict
+  let baseTemplateRules = String(tplObj.rules || tplObj.body || "");
+  if (baseTemplateRules.includes("184개 레시피") && !String(title || "").includes("레시피")) {
+    baseTemplateRules = "";
+  }
+
   const combinedRules = extraClean
-    ? `${tplObj.rules || tplObj.body || ""}\n\n[사용자 추가 요약·편집 명령어 (최우선 반영)]\n${extraClean}`.trim()
-    : tplObj.rules || tplObj.body || "";
+    ? `${baseTemplateRules}\n\n[사용자 지정 요약 컨셉 및 추가 명령어 (최우선 반영)]\n${extraClean}`.trim()
+    : baseTemplateRules;
 
   const isStaticWebMode = document.body.classList.contains("static-public-mode") && location.port !== "18765";
   if (isStaticWebMode) {
@@ -2001,7 +2007,8 @@ function renderHanaroChaptersHtml(chapters, ratio = 30, templateName = "기본�
           return `${subHeadingText ? `<h3 class="hanaro-h3">${escapeHtml(subHeadingText)}</h3>` : ""}${bodyParagraphs}${evidenceHtml}`;
         })
         .join("");
-      const chHeading = ch.num ? `${ch.num}. ${ch.title}` : ch.title;
+      const cleanChTitle = String(ch.title || "").replace(/^\[구간\s*\d+\]\s*/g, "").trim();
+      const chHeading = ch.num ? `${ch.num}. ${cleanChTitle}` : cleanChTitle;
       return `${chHeading ? `<h2 class="hanaro-h2-major">${escapeHtml(chHeading)}</h2>` : ""}${subsHtml}`;
     })
     .join("");
@@ -2621,12 +2628,30 @@ function reportSaveError(error) {
   showToast(`저장 미완료: ${error.message}`);
 }
 
+function stripChunkPrefixFromSummariesList(summariesList) {
+  if (!Array.isArray(summariesList)) return;
+  const prefixRegex = /\[구간\s*\d+\]\s*/g;
+  summariesList.forEach((s) => {
+    if (!s || typeof s !== "object") return;
+    if (typeof s.originalHtml === "string" && prefixRegex.test(s.originalHtml)) {
+      s.originalHtml = s.originalHtml.replace(prefixRegex, "");
+    }
+    if (typeof s.editedHtml === "string" && prefixRegex.test(s.editedHtml)) {
+      s.editedHtml = s.editedHtml.replace(prefixRegex, "");
+    }
+    if (Array.isArray(s.outline)) {
+      s.outline = s.outline.map((o) => String(o || "").replace(/^\[구간\s*\d+\]\s*/g, "").trim());
+    }
+  });
+}
+
 function applyServerState(remote, base, submitted) {
   const currentKey = state.summaries.find((s) => s.id === state.currentSummaryId);
   const latestKey = state.summaries.find((s) => s.id === latestCreatedSummaryId);
   const localView = Object.fromEntries([...SummarySync.localKeys].map((k) => [k, state[k]]));
   const merged = submitted ? SummarySync.rebase(submitted, state, remote) : remote;
   Object.assign(state, merged, localView);
+  stripChunkPrefixFromSummariesList(state.summaries);
   state.summaries.sort((a, b) => b.id - a.id);
   if (currentKey) {
     state.currentSummaryId = state.summaries.find((s) => SummarySync.key(s) === SummarySync.key(currentKey))?.id
@@ -6556,9 +6581,47 @@ document.getElementById("detail-export-txt-btn")?.addEventListener("click", () =
   showToast("텍스트(.txt) 파일이 다운로드되었습니다.");
 });
 
+function printSummaryWithDocumentTitle() {
+  const item = state.summaries.find((s) => s.id === state.currentSummaryId);
+  const prevTitle = document.title;
+  const targetTitle = (item?.title || document.getElementById("summary-title")?.textContent || prevTitle).trim();
+  if (targetTitle) {
+    document.title = targetTitle;
+  }
+  let restored = false;
+  const restoreTitle = () => {
+    if (restored) return;
+    restored = true;
+    window.removeEventListener("afterprint", restoreTitle);
+    document.title = prevTitle;
+  };
+  window.addEventListener("afterprint", restoreTitle);
+  window.print();
+  setTimeout(restoreTitle, 1500);
+}
+
+window.addEventListener("beforeprint", () => {
+  const summaryPage = document.getElementById("summary");
+  const readerModal = document.getElementById("public-reader-modal");
+  if ((summaryPage && !summaryPage.hidden) || (readerModal && readerModal.open)) {
+    const item = state.summaries.find((s) => s.id === state.currentSummaryId);
+    if (item && item.title) {
+      document.body.dataset.prevDocTitleBeforePrint = document.title;
+      document.title = item.title.trim();
+    }
+  }
+});
+
+window.addEventListener("afterprint", () => {
+  if (document.body.dataset.prevDocTitleBeforePrint) {
+    document.title = document.body.dataset.prevDocTitleBeforePrint;
+    delete document.body.dataset.prevDocTitleBeforePrint;
+  }
+});
+
 document.getElementById("detail-print-pdf-btn")?.addEventListener("click", () => {
   document.getElementById("detail-export-dropdown")?.removeAttribute("open");
-  window.print();
+  printSummaryWithDocumentTitle();
 });
 
 document.getElementById("detail-ratio")?.addEventListener("input", (e) => {
@@ -6567,7 +6630,18 @@ document.getElementById("detail-ratio")?.addEventListener("input", (e) => {
 
 document.getElementById("detail-concept-badge")?.addEventListener("click", () => {
   if (!isAdminLoggedIn()) return;
+  renderSummaryDetail(state.currentSummaryId);
+  const modalBanner = document.getElementById("detail-resum-result-banner");
+  if (modalBanner) modalBanner.hidden = true;
   document.getElementById("ratio")?.showModal();
+});
+
+document.querySelectorAll('[data-open="ratio"]').forEach((btn) => {
+  btn.addEventListener("click", () => {
+    renderSummaryDetail(state.currentSummaryId);
+    const modalBanner = document.getElementById("detail-resum-result-banner");
+    if (modalBanner) modalBanner.hidden = true;
+  });
 });
 
 document.getElementById("detail-open-concepts-page-link")?.addEventListener("click", () => {
@@ -6583,13 +6657,37 @@ document.getElementById("detail-resum-concept")?.addEventListener("change", (e) 
   }
 });
 
+function showResummarizeResultNotification(ok, message) {
+  const modalBanner = document.getElementById("detail-resum-result-banner");
+  const detailBanner = document.getElementById("detail-resum-outcome-banner");
+  const cls = ok ? "ai-conn-status ok" : "ai-conn-status fail";
+  const prefix = ok ? "✔ [재요약 완료] " : "✖ [재요약 실패] ";
+  if (modalBanner) {
+    modalBanner.className = cls;
+    modalBanner.textContent = prefix + message;
+    modalBanner.hidden = false;
+  }
+  if (detailBanner) {
+    detailBanner.className = cls;
+    detailBanner.textContent = prefix + message;
+    detailBanner.hidden = false;
+  }
+  showToast(prefix + message);
+}
+
 document.getElementById("apply-ratio-btn")?.addEventListener("click", async () => {
   const item = state.summaries.find((s) => s.id === state.currentSummaryId);
   if (!item) return;
   const applyBtn = document.getElementById("apply-ratio-btn");
+  const modalBanner = document.getElementById("detail-resum-result-banner");
   if (applyBtn) {
     applyBtn.disabled = true;
-    applyBtn.textContent = "재요약 중...";
+    applyBtn.textContent = "재요약 진행 중...";
+  }
+  if (modalBanner) {
+    modalBanner.className = "ai-conn-status testing";
+    modalBanner.textContent = "⟳ 선택한 요약률 · 서식 · 요약 컨셉으로 AI 재요약을 진행하고 있습니다...";
+    modalBanner.hidden = false;
   }
   try {
     const newRatio = Number(document.getElementById("detail-ratio").value || 30);
@@ -6655,18 +6753,21 @@ document.getElementById("apply-ratio-btn")?.addEventListener("click", async () =
         combinedConceptAndExtra
       );
     }
+    if (!resummarized || !resummarized.html) {
+      throw new Error("생성된 요약 본문이 비어 있습니다.");
+    }
     item.ratio = newRatio;
     item.template = chosenTplObj.name;
     item.concept = chosenConObj.name;
     item.conceptPrompt = editedConPrompt;
     item.aiModel = resummarized.engine || aiLabel;
     item.quality = resummarized.quality;
-    item.originalHtml = resummarized.html;
+    item.originalHtml = String(resummarized.html || "").replace(/\[구간\s*\d+\]\s*/g, "");
     if (!hadCustomEdit || overwriteEdited) {
-      item.editedHtml = resummarized.html;
+      item.editedHtml = item.originalHtml;
     }
     item.takeaways = resummarized.takeaways;
-    item.outline = resummarized.outline;
+    item.outline = (resummarized.outline || []).map((o) => String(o || "").replace(/^\[구간\s*\d+\]\s*/g, "").trim());
     item.excerpt = resummarized.excerpt;
 
     activeVersionTab = "original";
@@ -6676,13 +6777,18 @@ document.getElementById("apply-ratio-btn")?.addEventListener("click", async () =
       tab.setAttribute("aria-selected", String(isOrig));
     });
     await flushAppState();
-    document.getElementById("ratio").close();
     renderSummaryDetail(item.id);
     renderResultsLibrary();
     renderPublicView();
-    showToast(`요약률 ${newRatio}% · 서식[${chosenTplObj.name}] · 컨셉[${chosenConObj.name}]으로 다시 요약하여 기록했습니다.`);
+    const successMsg = `요약률 ${newRatio}% · 서식[${chosenTplObj.name}] · 컨셉[${chosenConObj.name}]으로 재요약 및 저장이 완료되었습니다 (${new Date().toLocaleTimeString()}).`;
+    showResummarizeResultNotification(true, successMsg);
+    setTimeout(() => {
+      const modal = document.getElementById("ratio");
+      if (modal && modal.open) modal.close();
+    }, 650);
   } catch (error) {
-    showToast(`재요약 실패: ${error.message}`);
+    const failMsg = `${error.message || "알 수 없는 오류가 발생했습니다."} (${new Date().toLocaleTimeString()})`;
+    showResummarizeResultNotification(false, failMsg);
   } finally {
     if (applyBtn) {
       applyBtn.disabled = false;
