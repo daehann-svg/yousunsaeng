@@ -353,8 +353,7 @@ def summarize_complete(data):
             attempt_system = chunk_system + f"\n직전 결과 검증 실패: {validation_error}{repair_hint}\n전체 원문을 다시 읽고 수정된 JSON을 반환하세요."
         for chapter in result["chapters"]:
             chapter["num"] = "" if config.get("isFreeform") else str(len(chapters) + 1)
-            if len(chunks) > 1:
-                chapter["title"] = f"[구간 {index + 1}] {chapter['title']}"
+            chapter["title"] = re.sub(r"^\[구간\s*\d+\]\s*", "", str(chapter.get("title") or "")).strip()
             chapters.append(chapter)
         points.extend(result["keypoints"])
     return {
