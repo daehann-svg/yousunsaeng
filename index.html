@@ -18,6 +18,7 @@
       <a href="#results" data-route="results" data-admin-only><i data-icon="grid"></i>요약 라이브러리<span class="nav-count">26</span></a>
       <a href="#input" data-route="input" data-admin-only><i data-icon="plus-square"></i>새 요약 만들기</a>
       <a href="#templates" data-route="templates" data-admin-only><i data-icon="file"></i>서식 설정</a>
+      <a href="#concepts" data-route="concepts" data-admin-only><i data-icon="sparkles"></i>요약 컨셉</a>
       <a href="#summary" data-route="summary" data-admin-only><i data-icon="layers"></i>You선생 페이지</a>
       <a href="#view" data-route="view"><i data-icon="globe"></i>You선생 공개페이지<i class="nav-end" data-icon="arrow-up-right"></i></a>
       <a href="#github" data-route="github" data-admin-only><i data-icon="share"></i>깃허브 등록</a>
@@ -98,12 +99,12 @@
       </section>
 
       <section id="input" class="page" hidden aria-labelledby="input-title">
-        <div class="page-heading"><div><h1 id="input-title">새 요약 만들기<span class="title-dot">.</span></h1><p>유튜브 영상 링크를 입력하고 분류·요약률·서식을 선택하세요.</p></div><a href="#results" class="button secondary"><i data-icon="arrow-left"></i>라이브러리</a></div>
+        <div class="page-heading"><div><h1 id="input-title">새 요약 만들기<span class="title-dot">.</span></h1><p>유튜브 영상 링크를 입력하고 분류·요약률·서식·요약 컨셉을 선택하세요.</p></div><a href="#results" class="button secondary"><i data-icon="arrow-left"></i>라이브러리</a></div>
         <div class="creation-layout">
           <div class="creation-main">
             <div class="form-card url-settings-card">
-              <div class="card-heading"><span class="step-number">01</span><div><h2>어떤 영상을 요약할까요?</h2><p>URL 옆에서 영상별 분류, 요약률, 서식을 각각 설정하세요.</p></div><i data-icon="link"></i></div>
-              <div class="default-ratio-bar" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 14px;margin-bottom:14px;background:#f5f8f2;border:1px solid #d5e2ce;border-radius:9px;font-size:12px;color:#2c432b">
+              <div class="card-heading"><span class="step-number">01</span><div><h2>어떤 영상을 요약할까요?</h2><p>URL 옆에서 영상별 분류, 요약률, 서식, 요약 컨셉을 각각 설정하세요.</p></div><i data-icon="link"></i></div>
+              <div class="default-ratio-bar" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 14px;margin-bottom:10px;background:#f5f8f2;border:1px solid #d5e2ce;border-radius:9px;font-size:12px;color:#2c432b">
                 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
                   <strong><i data-icon="sliders"></i>기본 요약률(디폴트) 설정</strong>
                   <select id="default-ratio-select" aria-label="기본 요약률 설정" style="width:auto;height:32px;padding:4px 10px;font-size:12px;font-weight:700;background:#fff;border:1px solid #bfd2b5;border-radius:6px;color:#244b40">
@@ -119,6 +120,17 @@
                 </div>
                 <button type="button" class="button secondary" id="apply-default-ratio-all-btn" style="min-height:32px;padding:5px 11px;font-size:11.5px">현재 입력칸 전체에 적용</button>
               </div>
+              <div class="default-concept-bar" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 14px;margin-bottom:14px;background:#f6f5fb;border:1px solid #dcd7ec;border-radius:9px;font-size:12px;color:#2d2846">
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                  <strong><i data-icon="sparkles"></i>기본 요약 컨셉(디폴트) 설정</strong>
+                  <select id="default-concept-select" aria-label="기본 요약 컨셉 설정" style="width:auto;min-width:210px;height:32px;padding:4px 10px;font-size:12px;font-weight:700;background:#fff;border:1px solid #c5bddf;border-radius:6px;color:#392e5c"></select>
+                  <span style="font-size:11px;color:#5f5878">새 영상 요약 시 어떤 관점·방향으로 내용을 구성할지 기본 컨셉으로 자동 지정됩니다.</span>
+                </div>
+                <div style="display:flex;gap:6px;flex-wrap:wrap">
+                  <button type="button" class="button secondary" id="apply-default-concept-all-btn" style="min-height:32px;padding:5px 11px;font-size:11.5px">현재 입력칸 전체에 적용</button>
+                  <a href="#concepts" class="button secondary" style="min-height:32px;padding:5px 11px;font-size:11.5px"><i data-icon="settings"></i>요약 컨셉 관리</a>
+                </div>
+              </div>
               <div id="video-entries-list">
                 <div class="entry-block" data-entry="1">
                   <div class="video-entry" data-entry="1">
@@ -126,6 +138,7 @@
                     <div class="entry-category"><span class="field-label" id="category-label-1">분류</span><button type="button" class="entry-category-button" data-category-picker aria-labelledby="category-label-1 category-value-1" aria-haspopup="dialog" aria-controls="category-picker"><i data-icon="bookmark"></i><span id="category-value-1" data-category-value>미정</span><i data-icon="chevron-down"></i></button></div>
                     <div class="entry-ratio"><label class="field-label" for="ratio-1">요약률</label><select id="ratio-1" class="entry-ratio-select"><option value="10">10%</option><option value="20">20%</option><option value="30" selected>30%</option><option value="40">40%</option><option value="50">50%</option><option value="60">60%</option><option value="70">70%</option></select></div>
                     <div class="entry-template"><label class="field-label" for="template-1">요약 서식</label><select id="template-1" data-template-select><option value="">기본서식 (미선택)</option><option value="bullets">핵심 bullet형</option><option value="report">리포트형</option></select></div>
+                    <div class="entry-concept"><label class="field-label" for="concept-1">요약 컨셉</label><select id="concept-1" class="entry-concept-select" data-concept-select></select></div>
                     <button type="button" class="icon-button entry-remove" aria-label="URL 1 삭제"><i data-icon="x"></i></button>
                   </div>
                   <div class="entry-script-box">
@@ -241,6 +254,21 @@
         <div class="template-grid" id="template-grid"></div>
       </section>
 
+      <section id="concepts" class="page" hidden aria-labelledby="concepts-title">
+        <div class="page-heading">
+          <div>
+            <h1 id="concepts-title">요약 컨셉<span class="title-dot">.</span></h1>
+            <p>서식(글의 외형 틀)과 별개로, 어떤 관점·중심주제·대상·소재로 내용을 구성하고 해석할지 여러 요약 컨셉을 생성하고 기본 컨셉(디폴트)을 지정하세요.</p>
+          </div>
+          <button class="button primary" data-open="concept-add"><i data-icon="plus"></i>새 요약 컨셉 생성</button>
+        </div>
+        <div class="template-section-heading">
+          <h2>등록된 요약 컨셉 <span id="concept-count">5</span></h2>
+          <span>현재 기본 적용 컨셉(디폴트): <strong id="active-concept-banner-name">설교·강연 핵심원리 및 영적 적용 (표준)</strong></span>
+        </div>
+        <div class="template-grid" id="concept-grid"></div>
+      </section>
+
       <section id="summary" class="page" hidden aria-labelledby="summary-title">
         <div class="detail-top-nav">
           <a href="#results" class="back-link"><i data-icon="arrow-left"></i>라이브러리로 돌아가기</a>
@@ -252,6 +280,7 @@
         <div class="detail-heading">
           <div class="detail-badges">
             <span class="tag tag-blue" id="detail-category-badge">1. 기도</span>
+            <span class="tag tag-purple" id="detail-concept-badge" title="클릭하여 요약 컨셉 및 재요약 설정 열기" style="cursor:pointer"><i data-icon="sparkles"></i><span id="detail-concept-badge-text">설교·강연 핵심원리</span></span>
             <span class="draft-badge" id="detail-status-badge"><span></span>공개 게시됨</span>
           </div>
           <div class="detail-title-row">
@@ -267,6 +296,7 @@
             <span id="detail-channel"><i data-icon="youtube"></i>EO 이오</span>
             <span id="detail-date"><i data-icon="calendar"></i>작업일 2026.10.17</span>
             <span id="detail-ratio-meta"><i data-icon="sliders"></i>요약률 30%</span>
+            <span id="detail-concept-meta"><i data-icon="sparkles"></i>컨셉: 기본 컨셉</span>
             <span id="detail-ai-meta"><i data-icon="sparkles"></i>GPT-4o</span>
           </div>
           <a class="source-link" id="detail-source-link" href="https://www.youtube.com/@eo_studio" target="_blank" rel="noopener noreferrer">https://www.youtube.com/@eo_studio <i data-icon="arrow-up-right"></i></a>
@@ -702,6 +732,7 @@
                   <a href="#results" class="button secondary" style="justify-content:flex-start"><i data-icon="grid"></i>요약 라이브러리 (<span id="admin-stat-total">0</span>)</a>
                   <a href="#input" class="button secondary" style="justify-content:flex-start"><i data-icon="plus-square"></i>새 요약 만들기</a>
                   <a href="#templates" class="button secondary" style="justify-content:flex-start"><i data-icon="file"></i>서식 설정</a>
+                  <a href="#concepts" class="button secondary" style="justify-content:flex-start"><i data-icon="sparkles"></i>요약 컨셉</a>
                   <a href="#github" class="button secondary" style="justify-content:flex-start"><i data-icon="share"></i>깃허브 등록</a>
                   <a href="#view" class="button secondary" style="justify-content:flex-start"><i data-icon="globe"></i>You선생 공개페이지 (<span id="admin-stat-published">0</span>)</a>
                 </div>
@@ -852,19 +883,71 @@
       <button type="button" class="button primary danger-solid" id="confirm-delete-btn"><i data-icon="trash"></i>삭제 확인</button>
     </div>
   </dialog>
+  <dialog id="concept-add" class="modal" aria-labelledby="concept-add-title">
+    <div class="modal-heading">
+      <div><span class="eyebrow">SUMMARY CONCEPT DESIGNER</span><h2 id="concept-add-title">새 요약 컨셉 생성</h2></div>
+      <button class="icon-button" data-close aria-label="요약 컨셉 창 닫기"><i data-icon="x"></i></button>
+    </div>
+    <p class="modal-description">서식(글의 외형 틀)과 별개로, 영상의 내용을 <strong>어떤 관점·초점·대상·방식으로 발췌하고 구성할지(요약 컨셉)</strong>를 설정하세요.</p>
+    <form id="concept-form">
+      <input type="hidden" id="concept-edit-id">
+      <label class="field-label" for="concept-name">요약 컨셉 이름 <span>*</span></label>
+      <input class="template-input" id="concept-name" placeholder="예: 설교 영적원리·해답 중심 / 예화·간증 스토리 중심 / 초신자 눈높이 해설" required maxlength="50">
+      <label class="field-label template-body-label" for="concept-desc">컨셉 한 줄 설명</label>
+      <input class="template-input" id="concept-desc" placeholder="예: 영상 제목의 핵심 질문에 대한 성경적 원인과 해답, 삶의 결단을 중심으로 내용을 구성합니다." maxlength="140">
+      <div class="algo-form-grid" style="margin-top:12px">
+        <div>
+          <label class="field-label" for="concept-focus">핵심 초점 (발췌 기준)</label>
+          <input class="template-input" id="concept-focus" placeholder="예: 성경 구절의 영적 상징과 문제 해결 원리" maxlength="80">
+        </div>
+        <div>
+          <label class="field-label" for="concept-audience">타깃 독자 · 활용 목적</label>
+          <input class="template-input" id="concept-audience" placeholder="예: 성도 개인 묵상 및 설교 노트 정리" maxlength="80">
+        </div>
+      </div>
+      <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <span style="font-size:11px;color:#5a6b58;font-weight:600">컨셉 예시 빠르게 채우기:</span>
+        <button type="button" class="script-action-btn secondary" data-concept-preset="sermon" style="padding:4px 9px;font-size:11px">설교 원리·해답형</button>
+        <button type="button" class="script-action-btn secondary" data-concept-preset="story" style="padding:4px 9px;font-size:11px">예화·간증 생생형</button>
+        <button type="button" class="script-action-btn secondary" data-concept-preset="cell" style="padding:4px 9px;font-size:11px">소그룹 나눔·기도제목형</button>
+        <button type="button" class="script-action-btn secondary" data-concept-preset="lecture" style="padding:4px 9px;font-size:11px">일반 강연·지식 인사이트형</button>
+        <button type="button" class="script-action-btn secondary" data-concept-preset="fact" style="padding:4px 9px;font-size:11px">원문 팩트·핵심논리형</button>
+      </div>
+      <label class="field-label template-body-label" for="concept-prompt">내용 구성 컨셉 상세 지침 (AI 프롬프트) <span>*</span></label>
+      <textarea class="template-input" id="concept-prompt" rows="6" placeholder="AI가 내용을 뽑아내고 해석할 때 지켜야 할 컨셉 지침을 작성하세요.&#10;예시:&#10;1. 단순 시간순 요약이 아니라 영상 제목의 핵심 질문에 대한 성경적 원인과 해답을 중심으로 내용을 구성하세요.&#10;2. 설교자가 인용한 성경 본문(장·절)과 실제 예화·간증을 생략하지 말고 구체적으로 살려 서술하세요.&#10;3. 각 단락 끝에 성도가 오늘 삶에서 실천할 영적 결단을 명확히 제시하세요." required maxlength="4000"></textarea>
+      <p class="template-error" id="concept-error" role="alert" hidden></p>
+      <div class="modal-footer">
+        <span>저장한 요약 컨셉은 새 요약 만들기 및 재요약에서 즉시 선택할 수 있습니다.</span>
+        <button class="button primary" type="submit" id="concept-submit-btn"><i data-icon="check-circle"></i>요약 컨셉 저장</button>
+      </div>
+    </form>
+  </dialog>
   <dialog id="ratio" class="modal">
-    <div class="modal-heading"><h2>재요약 · 요약률 및 서식 변경</h2><button class="icon-button" data-close aria-label="요약률 창 닫기"><i data-icon="x"></i></button></div>
-    <p class="modal-description">원하는 요약률, 요약 서식, 추가 AI 명령어를 입력해 즉시 다시 요약합니다.</p>
+    <div class="modal-heading"><h2>재요약 · 요약률 · 서식 · 요약 컨셉 변경</h2><button class="icon-button" data-close aria-label="요약률 창 닫기"><i data-icon="x"></i></button></div>
+    <p class="modal-description">원하는 요약률, 요약 서식, <strong>요약 컨셉(내용 구성 방향)</strong>을 선택하거나 수정해 즉시 다시 요약합니다.</p>
     <label class="field-label" for="detail-ratio">요약률 <strong id="detail-ratio-label">30%</strong> (대주제·핵심 개수 자동 연동)</label>
     <input class="ratio-range" id="detail-ratio" type="range" min="10" max="70" step="10" value="30">
     <div class="range-labels"><span>10% · 핵심만 간결하게</span><span>70% · 맥락까지 자세하게</span></div>
-    <div style="margin-top:12px">
-      <label class="field-label" for="detail-resum-template">적용할 요약 서식</label>
-      <select id="detail-resum-template" data-template-select></select>
+    <div class="algo-form-grid" style="margin-top:12px">
+      <div>
+        <label class="field-label" for="detail-resum-template">적용할 요약 서식 (글의 외형 틀)</label>
+        <select id="detail-resum-template" data-template-select></select>
+      </div>
+      <div>
+        <label class="field-label" for="detail-resum-concept">적용할 요약 컨셉 (내용 구성 관점)</label>
+        <select id="detail-resum-concept" data-concept-select></select>
+      </div>
     </div>
-    <div style="margin-top:12px">
-      <label class="field-label" for="detail-resum-extra-prompt">✨ AI 추가 요약 명령어 (선택사항)</label>
-      <input type="text" id="detail-resum-extra-prompt" class="template-input" placeholder="예: 예화와 성경 본문을 더 상세히 작성해줘 / 청년부 눈높이에 맞춰 적용점을 써줘">
+    <div style="margin-top:10px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">
+        <label class="field-label" for="detail-resum-concept-prompt" style="margin:0">선택한 요약 컨셉 지침 확인 · 즉석 수정</label>
+        <a href="#concepts" class="text-button" id="detail-open-concepts-page-link" style="font-size:10.5px;color:#284e40;font-weight:600">요약 컨셉 관리 페이지 열기 →</a>
+      </div>
+      <textarea id="detail-resum-concept-prompt" class="template-input" rows="3" placeholder="선택한 요약 컨셉의 상세 지침이 표시됩니다. 이번 재요약에서 원하는 대로 바로 수정할 수 있습니다." style="font-size:11px;line-height:1.6"></textarea>
+    </div>
+    <div style="margin-top:10px">
+      <label class="field-label" for="detail-resum-extra-prompt">✨ 추가 특별 요청사항 (선택사항)</label>
+      <input type="text" id="detail-resum-extra-prompt" class="template-input" placeholder="예: 특정 성경 구절을 더 강조해줘 / 마지막에 기도제목을 3줄로 넣어줘">
     </div>
     <label class="overwrite-edit-check" style="display:flex;align-items:center;gap:7px;margin-top:14px;font-size:11px;color:#5f7056;cursor:pointer">
       <input type="checkbox" id="detail-overwrite-edited">
