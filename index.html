@@ -741,7 +741,63 @@
           </div>
         </div>
 
-        <!-- 3. 관리자 페이지 하단: 주요 기능 간략 안내 -->
+              <div class="form-card" id="admin-api-capacity-guide-card" aria-label="AI API별 요약 가능 분량 및 운영 지침">
+                <div class="card-heading">
+                  <span class="step-number"><i data-icon="info"></i></span>
+                  <div>
+                    <h2>AI API별 요약 가능 분량 및 권장 운영 지침</h2>
+                    <p>AI 모델별 1회 입력·출력 한도와 You선생의 자동 분할(24,000자 Chunking) 처리 기준에 따른 영상 길이·원고 분량 가이드입니다.</p>
+                  </div>
+                </div>
+
+                <div class="admin-features-grid" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px">
+                  <div class="admin-feature-item" style="border-left:3px solid #284e40">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap">
+                      <strong>1. Gemini API (무료/표준 · <code>AIza...</code>)</strong>
+                      <span class="tag tag-sage">★ 장문 · 설교 최적</span>
+                    </div>
+                    <p style="margin-top:4px">
+                      • <strong>컨텍스트 한도</strong>: 최대 <strong>100만 토큰</strong> (한국어 약 60만~70만 자) / 최대 출력 <strong>65,536 토큰</strong><br>
+                      • <strong>자막·원고 요약 분량</strong>: <strong>24,000자 단위 자동 분할(Chunking)</strong> 처리로 <strong>1시간~3시간 이상 장편 설교·강연(3만~10만 자 이상)</strong>도 중간 누락 없이 전체 요약 가능<br>
+                      • <strong>무자막 오디오·영상 직접 분석</strong>: 약 <strong>45분~90분 이내</strong> 영상 권장 (웹/모바일에서도 2단계 전사+심층 요약 지원)<br>
+                      • <strong>할당량 지침</strong>: 무료 티어는 분당 요청 수(RPM 15회 내외) 제한이 있으므로 <strong>연속 다중 요약 시 1회 3~5개 이하 배치</strong> 권장
+                    </p>
+                  </div>
+
+                  <div class="admin-feature-item" style="border-left:3px solid #7c5cbf">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap">
+                      <strong>2. Gemini API (VS Code 설정 연동)</strong>
+                      <span class="tag tag-purple">고밀도 심층 분석</span>
+                    </div>
+                    <p style="margin-top:4px">
+                      • <strong>컨텍스트 한도</strong>: 입력 <strong>100만 토큰</strong> / 출력 <strong>65,536 토큰</strong> (<code>gemini-2.5-flash</code> / <code>gemini-3.8-flash</code> / <code>gemini-2.5-pro</code>)<br>
+                      • <strong>권장 요약 분량</strong>: 일반 강연(15~40분, 1만~2.4만 자)은 <strong>1구간 단일 패스</strong>로, 장편 예배·세미나(50~120분, 2.5만~6만 자)는 <strong>2~3구간 분할 합산</strong>으로 고밀도 요약<br>
+                      • <strong>권장 지침</strong>: 요약률 <strong>50~70%</strong> 설정 시 소제목당 4~6문장(220자 이상) 심층 문단 생성에 가장 적합
+                    </p>
+                  </div>
+
+                  <div class="admin-feature-item" style="border-left:3px solid #3b76a8">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap">
+                      <strong>3. OpenAI (<code>sk-...</code>) / GitHub Models (<code>ghp_...</code>)</strong>
+                      <span class="tag tag-blue">단·중편 텍스트 전용</span>
+                    </div>
+                    <p style="margin-top:4px">
+                      • <strong>컨텍스트 한도</strong>: OpenAI <code>gpt-4o-mini</code> 입력 <strong>128K 토큰</strong> (출력 최대 <strong>16,384 토큰</strong>) / GitHub Models 무료 토큰은 요청당 <strong>약 8,000 토큰(원고 12,000~15,000자)</strong> 제한<br>
+                      • <strong>권장 요약 분량</strong>: <strong>15분~30분 이내의 중·단편 강연(원고 15,000자 이하)</strong> 또는 핵심 불릿(Bullet)·리포트 요약에 권장<br>
+                      • <strong>주의 지침</strong>: 자막이 없는 영상의 <strong>오디오/영상 직접 멀티모달 분석은 지원하지 않으므로</strong>, 무자막 영상은 반드시 <strong>Gemini API</strong>를 선택하세요.
+                    </p>
+                  </div>
+                </div>
+
+                <div style="margin-top:12px;padding:12px 14px;background:#f4f8f1;border:1px solid #cfe0c7;border-radius:9px;font-size:11.5px;line-height:1.75;color:#2c422c">
+                  <strong style="display:block;margin-bottom:4px;color:#1f382d">💡 요약률(10%~70%) 및 원고 길이에 따른 실전 분량 지침</strong>
+                  • <strong>구간 분할 기준</strong>: 원고 <code>24,000자</code>(약 45분 분량)마다 구간(Chunk)이 나뉘어 각각 AI 요약을 수행한 뒤 하나로 병합됩니다. (예: <code>35,000자</code> 설교 = <code>구간 1(24,000자)</code> + <code>구간 2(11,000자)</code>)<br>
+                  • <strong>요약 컨셉 제외 지시 주의</strong>: 요약 컨셉에서 <em>“찬양·광고·기도 제외”</em> 등을 지정하면 해당 내용이 많은 구간(주로 예배 후반부)의 출력 글자수가 자연스럽게 줄어들며, 시스템이 안내 배지로 알려줍니다.<br>
+                  • <strong>대량 항목 원고(레시피·목록 등)</strong>: 소제목(<code>###</code>)이 15개 이상인 구조화 원고는 글자수 손실 없이 <strong>원문 항목 100% 보존 파서</strong>가 자동 작동하여 전 항목을 수록합니다.
+                </div>
+              </div>
+
+              <!-- 3. 관리자 페이지 하단: 주요 기능 간략 안내 -->
         <div class="form-card admin-features-summary-card" aria-label="You선생 주요 기능 안내">
           <div class="card-heading" style="margin-bottom:16px">
             <span class="step-number"><i data-icon="sparkles"></i></span>
