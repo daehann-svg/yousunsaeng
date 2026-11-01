@@ -160,6 +160,80 @@ const DEFAULT_TEMPLATES = [
   }
 ];
 
+const DEFAULT_CONCEPTS = [
+  {
+    id: "concept-sermon-core",
+    name: "설교·강연 핵심원리 및 영적 적용 (표준)",
+    badge: "★ 기본 컨셉 · 디폴트",
+    badgeColor: "sage",
+    desc: "영상 제목의 핵심 질문에 대한 성경적·본질적 원인과 해답을 중심축으로 삼고, 근거 구절·예화·삶의 적용을 깊이 있게 구성합니다.",
+    focus: "핵심 주제의 원인·상징·성경적 원리와 해답",
+    audience: "성도 개인 묵상 및 설교·강연 핵심 노트",
+    prompt:
+      "1. 단순 시간순 나열이 아니라 영상 제목의 핵심 주제를 중심축으로 삼고, 그 원인과 성경적·본질적 해답을 중심으로 내용을 구성하세요.\n" +
+      "2. 각 소제목마다 발표자(설교자)가 제시한 핵심 근거(성경 구절/배경)와 비유·예화를 구체적으로 서술하세요.\n" +
+      "3. 문단 끝에는 오늘 삶에서 결단하고 실천해야 할 적용 방향을 명확히 제시하세요.",
+    isDefault: true,
+    builtin: true
+  },
+  {
+    id: "concept-story-witness",
+    name: "예화 · 간증 · 스토리텔링 중심",
+    badge: "생생한 현장감",
+    badgeColor: "amber",
+    desc: "추상적인 이론 설명보다 설교자·강연자가 들려주는 실제 간증, 인물 이야기, 비유와 감동적인 에피소드를 중심으로 생생하게 구성합니다.",
+    focus: "실제 간증·예화·성경 인물 스토리와 교훈",
+    audience: "설교 예화 수집 및 감동적인 스토리 묵상",
+    prompt:
+      "1. 추상적인 명제보다 영상에서 언급된 실제 간증, 경험담, 예화, 성경 인물의 이야기를 생략하지 말고 구체적인 상황과 흐름이 살아나게 서술하세요.\n" +
+      "2. 각 예화·사례가 어떤 영적·삶의 원리를 보여주는지 스토리와 교훈을 연결하여 정리하세요.",
+    isDefault: false,
+    builtin: true
+  },
+  {
+    id: "concept-cell-prayer",
+    name: "소그룹 나눔 · 묵상 질문 · 기도제목 중심",
+    badge: "목장 · 구역모임 최적",
+    badgeColor: "purple",
+    desc: "개인 QT나 소그룹(목장·구역·셀) 모임에서 바로 나누고 함께 기도할 수 있도록 삶의 적용 질문과 합심 기도제목을 중심으로 구성합니다.",
+    focus: "삶의 적용 포인트, 나눔 질문, 합심 기도제목",
+    audience: "소그룹 리더, 구역장, 목장 나눔 및 개인 기도",
+    prompt:
+      "1. 말씀을 들은 성도들이 자신의 삶을 돌아보며 함께 이야기 나눌 수 있도록 공감 가는 문제의식과 위로·회복의 메시지를 중심으로 구성하세요.\n" +
+      "2. 각 대주제마다 삶에 적용할 구체적 실천 과제와 함께 붙들고 기도할 기도제목(회개·돌파·치유·감사)이 선명하게 드러나도록 작성하세요.",
+    isDefault: false,
+    builtin: true
+  },
+  {
+    id: "concept-general-insight",
+    name: "일반 강연 · 지식 · 비즈니스 인사이트 중심",
+    badge: "일반 지식·강연 전용",
+    badgeColor: "blue",
+    desc: "종교적 색채 없이 비즈니스·경제·인문·자기계발·테크 강연의 핵심 논리, 데이터, 트렌드, 실전 액션 플랜을 명쾌하게 정리합니다.",
+    focus: "핵심 인사이트, 근거 데이터·사례, 실전 실행 전략",
+    audience: "비즈니스·자기계발 학습자 및 전문가",
+    prompt:
+      "1. 종교적 표현을 배제하고, 강연자가 제시하는 핵심 통찰(Insight), 문제 정의, 원리, 실제 사례와 수치를 객관적이고 명확한 비즈니스·교양 문체로 구성하세요.\n" +
+      "2. 현업과 일상에 즉시 적용할 수 있는 구체적인 실행 전략(Action Plan)과 시사점을 도출하세요.",
+    isDefault: false,
+    builtin: true
+  },
+  {
+    id: "concept-strict-fact",
+    name: "원문 팩트 · 핵심 논거 정밀 보존형",
+    badge: "원문 100% 충실",
+    badgeColor: "gray",
+    desc: "주관적 해석이나 부연 설명을 최소화하고, 원문에서 실제로 발언한 사실·수치·조건·고유명사·핵심 논거만을 엄격하게 추려냅니다.",
+    focus: "원문 발언의 정확한 사실, 수치, 조건, 핵심 논증",
+    audience: "정확한 팩트 체크 및 원문 내용 정밀 파악",
+    prompt:
+      "1. 원문에 없는 추론이나 감정적 수식어를 일절 추가하지 말고, 원문에서 실제로 언급된 핵심 사실·수치·조건·인용 구절만을 정확하게 요약하세요.\n" +
+      "2. 발언자의 논증 구조(전제 → 근거 → 결론)와 예외 조건을 원문 그대로 보존하여 서술하세요.",
+    isDefault: false,
+    builtin: true
+  }
+];
+
 const DEFAULT_ACCOUNTS = [
   { id: "acc-daehann", name: "daehann", handle: "daehann@gmail.com", provider: "GitHub", initial: "D", active: true },
   { id: "acc-1", name: "지식 수집가", handle: "collector@github.com", provider: "GitHub", initial: "J", active: false },
@@ -791,7 +865,8 @@ async function runAudioSummarizationViaServer({
   templateName,
   customSections,
   audioBase64 = "",
-  audioMimeType = ""
+  audioMimeType = "",
+  conceptExtra = ""
 }) {
   const r = Number(ratio) || 30;
   const tplObj = findTemplateObject(templateName);
@@ -801,6 +876,10 @@ async function runAudioSummarizationViaServer({
       : Array.isArray(tplObj.sections) && tplObj.sections.length
       ? tplObj.sections
       : null;
+  const mergedRules = conceptExtra
+    ? `${tplObj.rules || tplObj.body || ""}\n\n${conceptExtra}`.trim()
+    : tplObj.rules || tplObj.body || "";
+  const tplWithConcept = { ...tplObj, rules: mergedRules };
 
   const isStaticWebMode = document.body.classList.contains("static-public-mode") && location.port !== "18765";
   if (isStaticWebMode) {
@@ -809,7 +888,7 @@ async function runAudioSummarizationViaServer({
       title,
       channel,
       ratio: r,
-      tplObj,
+      tplObj: tplWithConcept,
       customSections: effectiveSections,
       audioBase64,
       audioMimeType
@@ -839,7 +918,7 @@ async function runAudioSummarizationViaServer({
           subsPerChapter: tplObj.isFreeform ? 0 : (tplObj.subsPerChapter ?? 2),
           keypointCount: tplObj.isFreeform ? 0 : (tplObj.keypointCount ?? 16),
           tone: tplObj.tone || "formal",
-          rules: tplObj.rules || tplObj.body || ""
+          rules: mergedRules
         }
       })
     });
@@ -850,7 +929,7 @@ async function runAudioSummarizationViaServer({
       title,
       channel,
       ratio: r,
-      tplObj,
+      tplObj: tplWithConcept,
       customSections: effectiveSections,
       audioBase64,
       audioMimeType
@@ -887,6 +966,26 @@ function parseTimeToSeconds(timeStr) {
   if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
   if (parts.length === 2) return parts[0] * 60 + parts[1];
   return 0;
+}
+
+function getDefaultConcept() {
+  if (typeof state !== "undefined" && Array.isArray(state.concepts) && state.concepts.length) {
+    return (
+      state.concepts.find((c) => c.isDefault) ||
+      state.concepts[0] ||
+      DEFAULT_CONCEPTS[0]
+    );
+  }
+  return DEFAULT_CONCEPTS[0];
+}
+
+function findConceptObject(conceptIdOrName = "") {
+  if (!Array.isArray(state?.concepts) || !state.concepts.length) return DEFAULT_CONCEPTS[0];
+  if (!conceptIdOrName) return getDefaultConcept();
+  return (
+    state.concepts.find((c) => c.id === conceptIdOrName || c.name === conceptIdOrName) ||
+    getDefaultConcept()
+  );
 }
 
 function getDefaultTemplate() {
@@ -2402,6 +2501,9 @@ function loadAppState() {
           const freeTpl = DEFAULT_TEMPLATES.find((t) => t.id === "freeform");
           if (freeTpl) parsed.templates.push({ ...freeTpl });
         }
+        if (!Array.isArray(parsed.concepts) || !parsed.concepts.length) {
+          parsed.concepts = DEFAULT_CONCEPTS.map((c) => ({ ...c }));
+        }
         return parsed;
       }
     }
@@ -2411,6 +2513,7 @@ function loadAppState() {
   return {
     categories: DEFAULT_CATEGORIES,
     templates: DEFAULT_TEMPLATES,
+    concepts: DEFAULT_CONCEPTS.map((c) => ({ ...c })),
     accounts: DEFAULT_ACCOUNTS,
     summaries: INITIAL_SUMMARIES,
     currentSummaryId: INITIAL_SUMMARIES[0]?.id || 1,
@@ -2705,10 +2808,12 @@ async function syncLatestState(initial = false) {
     }
     syncAiModelInputsUI();
     syncDefaultRatioUI(false);
+    syncDefaultConceptUI(false);
     syncGithubConfigUI();
     syncAdminAuthUI();
     renderAccountsUI();
     renderTemplatesUI();
+    renderConceptsUI();
     refreshSummaryLists();
     if (initial) {
       renderSummaryDetail(state.currentSummaryId);
@@ -2746,10 +2851,12 @@ async function syncLatestState(initial = false) {
         document.body.classList.add("static-public-mode");
         syncAiModelInputsUI();
         syncDefaultRatioUI(false);
+        syncDefaultConceptUI(false);
         syncGithubConfigUI();
         syncAdminAuthUI();
         renderAccountsUI();
         renderTemplatesUI();
+        renderConceptsUI();
         refreshSummaryLists();
         if (initial) {
           renderSummaryDetail(state.currentSummaryId);
@@ -3325,6 +3432,62 @@ document.getElementById("apply-default-ratio-all-btn")?.addEventListener("click"
   showToast(`현재 입력칸 전체의 요약률을 기본값(${def}%)으로 변경했습니다.`);
 });
 
+function getConceptOptionsHtml(selectedVal = "") {
+  const conceptsList = Array.isArray(state.concepts) && state.concepts.length ? state.concepts : DEFAULT_CONCEPTS;
+  const defCon = getDefaultConcept();
+  return (
+    `<option value="" ${selectedVal === "" ? "selected" : ""}>자동: ${escapeHtml(defCon.name)} (현재 디폴트)</option>` +
+    conceptsList
+      .map((con) => {
+        const isDef = Boolean(con.isDefault) || con.id === defCon.id;
+        const label = `${con.name}${isDef ? " ★기본" : ""}`;
+        return `<option value="${escapeHtml(con.id)}" ${con.id === selectedVal || con.name === selectedVal ? "selected" : ""}>${escapeHtml(label)}</option>`;
+      })
+      .join("")
+  );
+}
+
+function syncDefaultConceptUI(applyToUnmodifiedEntries = false) {
+  const conceptsList = Array.isArray(state.concepts) && state.concepts.length ? state.concepts : DEFAULT_CONCEPTS;
+  const defCon = getDefaultConcept();
+  const defSelect = document.getElementById("default-concept-select");
+  if (defSelect) {
+    defSelect.innerHTML = conceptsList
+      .map(
+        (con) =>
+          `<option value="${escapeHtml(con.id)}" ${con.id === defCon.id ? "selected" : ""}>${escapeHtml(con.name)}${con.id === defCon.id ? " ★디폴트" : ""}</option>`
+      )
+      .join("");
+    defSelect.value = defCon.id;
+  }
+  document.querySelectorAll("#video-entries-list .entry-block").forEach((block) => {
+    const sel = block.querySelector(".entry-concept-select");
+    if (!sel) return;
+    const prevVal = applyToUnmodifiedEntries || !sel.dataset.userModified ? "" : sel.value || "";
+    sel.innerHTML = getConceptOptionsHtml(prevVal);
+    sel.value = prevVal;
+    if (applyToUnmodifiedEntries) delete sel.dataset.userModified;
+  });
+}
+
+document.getElementById("default-concept-select")?.addEventListener("change", (e) => {
+  const chosenId = e.target.value;
+  if (!Array.isArray(state.concepts)) state.concepts = DEFAULT_CONCEPTS.map((c) => ({ ...c }));
+  state.concepts.forEach((c) => {
+    c.isDefault = c.id === chosenId;
+  });
+  syncDefaultConceptUI(false);
+  renderConceptsUI();
+  saveAppState();
+  showToast(`기본 요약 컨셉(디폴트)이 ‘${getDefaultConcept().name}’(으)로 설정되었습니다.`);
+});
+
+document.getElementById("apply-default-concept-all-btn")?.addEventListener("click", () => {
+  const defCon = getDefaultConcept();
+  syncDefaultConceptUI(true);
+  showToast(`현재 입력칸 전체의 요약 컨셉을 기본값(‘${defCon.name}’)으로 적용했습니다.`);
+});
+
 function getTemplateOptionsHtml(selectedVal = "") {
   const defTpl = getDefaultTemplate();
   return `<option value="" ${selectedVal === "" ? "selected" : ""}>자동: ${escapeHtml(defTpl.name)} (현재 기본서식)</option>` + state.templates
@@ -3560,6 +3723,10 @@ function bindVideoEntryEvents(blockEl) {
   ratioSelectEl?.addEventListener("change", () => {
     ratioSelectEl.dataset.userModified = "1";
   });
+  const conceptSelectEl = entryEl.querySelector(".entry-concept-select");
+  conceptSelectEl?.addEventListener("change", () => {
+    conceptSelectEl.dataset.userModified = "1";
+  });
   pickerBtn?.addEventListener("click", () => {
     categoryPickerMode = "entry";
     activeCategoryButton = pickerBtn;
@@ -3638,6 +3805,11 @@ function bindVideoEntryEvents(blockEl) {
         if (index > 0) {
           row.querySelector(".entry-ratio-select").value = entryEl.querySelector(".entry-ratio-select").value;
           row.querySelector("[data-template-select]").value = entryEl.querySelector("[data-template-select]").value;
+          const srcConceptSel = entryEl.querySelector(".entry-concept-select");
+          const dstConceptSel = row.querySelector(".entry-concept-select");
+          if (srcConceptSel && dstConceptSel) {
+            dstConceptSel.value = srcConceptSel.value;
+          }
           const targetPicker = row.querySelector("[data-category-picker]");
           targetPicker.dataset.selectedCategories = pickerBtn.dataset.selectedCategories || "[]";
           targetPicker.querySelector("[data-category-value]").textContent = pickerBtn.querySelector("[data-category-value]").textContent;
@@ -3715,6 +3887,11 @@ function bindVideoEntryEvents(blockEl) {
         ratioSelectEl.innerHTML = getRatioOptionsHtml(getDefaultRatio());
         ratioSelectEl.value = String(getDefaultRatio());
       }
+      if (conceptSelectEl) {
+        delete conceptSelectEl.dataset.userModified;
+        conceptSelectEl.innerHTML = getConceptOptionsHtml("");
+        conceptSelectEl.value = "";
+      }
       showToast("최소 1개의 URL 입력칸은 유지됩니다. 입력 내용을 초기화했어요.");
       return;
     }
@@ -3734,9 +3911,10 @@ function renumberVideoEntries() {
     if (idxSpan) idxSpan.textContent = String(num);
     for (const [prefix, selector] of [
       ["video-url", 'input[type="url"]'], ["ratio", ".entry-ratio-select"],
-      ["template", "[data-template-select]"]
+      ["template", "[data-template-select]"], ["concept", ".entry-concept-select"]
     ]) {
       const control = block.querySelector(selector);
+      if (!control) continue;
       const label = block.querySelector(`label[for="${control.id}"]`);
       control.id = `${prefix}-${num}`;
       if (label) label.htmlFor = control.id;
@@ -3770,6 +3948,10 @@ function createVideoEntryRow(index) {
       <div class="entry-template">
         <label class="field-label" for="template-${index}">요약 서식</label>
         <select id="template-${index}" data-template-select>${getTemplateOptionsHtml()}</select>
+      </div>
+      <div class="entry-concept">
+        <label class="field-label" for="concept-${index}">요약 컨셉</label>
+        <select id="concept-${index}" class="entry-concept-select" data-concept-select>${getConceptOptionsHtml()}</select>
       </div>
       <button type="button" class="icon-button entry-remove" aria-label="URL ${index} 삭제">${iconSvg("x")}</button>
     </div>
@@ -4157,6 +4339,280 @@ templateForm?.addEventListener("submit", (event) => {
   renderTemplatesUI();
   templateForm.reset();
   document.getElementById("template-add").close();
+});
+
+// 4-B. Summary Concepts ('요약 컨셉') Page Rendering, Default Setting, Add / Edit / Copy / Delete
+const CONCEPT_PRESET_PROMPTS = {
+  sermon: {
+    name: "설교·강연 핵심원리 및 영적 적용",
+    desc: "영상 제목의 핵심 질문에 대한 성경적·본질적 원인과 해답을 중심축으로 삼고, 근거 구절·예화·삶의 적용을 깊이 있게 구성합니다.",
+    focus: "핵심 주제의 원인·상징·성경적 원리와 해답",
+    audience: "성도 개인 묵상 및 설교·강연 핵심 노트",
+    prompt:
+      "1. 단순 시간순 나열이 아니라 영상 제목의 핵심 주제를 중심축으로 삼고, 그 원인과 성경적·본질적 해답을 중심으로 내용을 구성하세요.\n" +
+      "2. 각 소제목마다 발표자(설교자)가 제시한 핵심 근거(성경 구절/배경)와 비유·예화를 구체적으로 서술하세요.\n" +
+      "3. 문단 끝에는 오늘 삶에서 결단하고 실천해야 할 적용 방향을 명확히 제시하세요."
+  },
+  story: {
+    name: "예화 · 간증 · 스토리텔링 중심",
+    desc: "추상적인 설명보다 설교자·강연자가 들려주는 실제 간증, 인물 이야기, 비유와 에피소드를 중심으로 생생하게 구성합니다.",
+    focus: "실제 간증·예화·성경 인물 스토리와 교훈",
+    audience: "설교 예화 수집 및 감동적인 스토리 묵상",
+    prompt:
+      "1. 추상적인 명제보다 영상에서 언급된 실제 간증, 경험담, 예화, 성경 인물의 이야기를 생략하지 말고 구체적인 상황과 흐름이 살아나게 서술하세요.\n" +
+      "2. 각 예화·사례가 어떤 영적·삶의 원리를 보여주는지 스토리와 교훈을 연결하여 정리하세요."
+  },
+  cell: {
+    name: "소그룹 나눔 · 묵상 질문 · 기도제목 중심",
+    desc: "소그룹(목장·구역·셀) 모임에서 바로 나누고 함께 기도할 수 있도록 삶의 적용 질문과 합심 기도제목을 중심으로 구성합니다.",
+    focus: "삶의 적용 포인트, 나눔 질문, 합심 기도제목",
+    audience: "소그룹 리더, 구역장, 목장 나눔 및 개인 기도",
+    prompt:
+      "1. 말씀을 들은 성도들이 자신의 삶을 돌아보며 함께 이야기 나눌 수 있도록 공감 가는 문제의식과 위로·회복의 메시지를 중심으로 구성하세요.\n" +
+      "2. 각 대주제마다 삶에 적용할 구체적 실천 과제와 함께 붙들고 기도할 기도제목(회개·돌파·치유·감사)이 선명하게 드러나도록 작성하세요."
+  },
+  lecture: {
+    name: "일반 강연 · 지식 · 비즈니스 인사이트 중심",
+    desc: "종교적 색채 없이 비즈니스·경제·인문·자기계발·테크 강연의 핵심 논리, 데이터, 트렌드, 실전 액션 플랜을 명쾌하게 정리합니다.",
+    focus: "핵심 인사이트, 근거 데이터·사례, 실전 실행 전략",
+    audience: "비즈니스·자기계발 학습자 및 전문가",
+    prompt:
+      "1. 종교적 표현을 배제하고, 강연자가 제시하는 핵심 통찰(Insight), 문제 정의, 원리, 실제 사례와 수치를 객관적이고 명확한 비즈니스·교양 문체로 구성하세요.\n" +
+      "2. 현업과 일상에 즉시 적용할 수 있는 구체적인 실행 전략(Action Plan)과 시사점을 도출하세요."
+  },
+  fact: {
+    name: "원문 팩트 · 핵심 논거 정밀 보존형",
+    desc: "주관적 해석이나 부연 설명을 최소화하고, 원문에서 실제로 발언한 사실·수치·조건·고유명사·핵심 논거만을 엄격하게 추려냅니다.",
+    focus: "원문 발언의 정확한 사실, 수치, 조건, 핵심 논증",
+    audience: "정확한 팩트 체크 및 원문 내용 정밀 파악",
+    prompt:
+      "1. 원문에 없는 추론이나 감정적 수식어를 일절 추가하지 말고, 원문에서 실제로 언급된 핵심 사실·수치·조건·인용 구절만을 정확하게 요약하세요.\n" +
+      "2. 발언자의 논증 구조(전제 → 근거 → 결론)와 예외 조건을 원문 그대로 보존하여 서술하세요."
+  }
+};
+
+function ensureConceptsState() {
+  if (!Array.isArray(state.concepts) || !state.concepts.length) {
+    state.concepts = DEFAULT_CONCEPTS.map((c) => ({ ...c }));
+  }
+  if (!state.concepts.some((c) => c.isDefault)) {
+    state.concepts[0].isDefault = true;
+  }
+  return state.concepts;
+}
+
+function renderConceptsUI() {
+  const conceptsList = ensureConceptsState();
+  const grid = document.getElementById("concept-grid");
+  const countEl = document.getElementById("concept-count");
+  if (countEl) countEl.textContent = String(conceptsList.length);
+  const defCon = getDefaultConcept();
+  const bannerEl = document.getElementById("active-concept-banner-name");
+  if (bannerEl && defCon) bannerEl.textContent = defCon.name;
+
+  if (grid) {
+    grid.innerHTML = conceptsList
+      .map((con, idx) => {
+        const isDefault = Boolean(con.isDefault) || con.id === defCon.id;
+        const specsHtml = `
+          <span><strong>핵심 초점:</strong> ${escapeHtml(con.focus || "핵심 메시지 및 원리 중심")}</span>
+          <span><strong>타깃 · 용도:</strong> ${escapeHtml(con.audience || "요약 노트 및 묵상·학습")}</span>
+          <span><strong>적용 범위:</strong> 모든 요약 서식과 조합 가능</span>
+          <span><strong>유형:</strong> ${con.builtin ? "표준 내장 컨셉" : "사용자 생성 컨셉"}</span>
+        `;
+        return `
+          <article class="template-card ${isDefault ? "default-template" : "custom-template"}">
+            <div class="template-card-top">
+              <span class="template-symbol">${iconSvg("sparkles")}</span>
+              <span class="tag tag-${isDefault ? "sage" : escapeHtml(con.badgeColor || "purple")}">
+                ${isDefault ? "★ 기본 컨셉 (디폴트 자동 적용)" : escapeHtml(con.badge || `컨셉 #${idx + 1}`)}
+              </span>
+            </div>
+            <h3>${escapeHtml(con.name)}</h3>
+            <p>${escapeHtml(con.desc || "지정한 관점과 방향으로 영상의 내용을 구성합니다.")}</p>
+            <div class="algo-specs" style="margin-bottom:10px">${specsHtml}</div>
+            <div class="template-structure"><div class="custom-template-body">${escapeHtml(con.prompt || "")}</div></div>
+            <div class="algo-card-actions" style="margin-top:12px">
+              <button type="button" class="algo-btn ${isDefault ? "primary-algo" : ""}" data-concept-default="${escapeHtml(con.id)}">
+                ${isDefault ? "현재 디폴트 컨셉" : "디폴트 컨셉으로 세팅"}
+              </button>
+              <div>
+                <button type="button" class="algo-btn" data-concept-edit="${escapeHtml(con.id)}">${iconSvg("edit")}컨셉 수정</button>
+                <button type="button" class="algo-btn" data-concept-copy="${escapeHtml(con.id)}">${iconSvg("file")}복사</button>
+                <button type="button" class="algo-btn danger-algo" data-concept-del="${escapeHtml(con.id)}">${iconSvg("trash")}삭제</button>
+              </div>
+            </div>
+          </article>
+        `;
+      })
+      .join("");
+
+    grid.querySelectorAll("[data-concept-default]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const targetId = btn.dataset.conceptDefault;
+        state.concepts.forEach((c) => {
+          c.isDefault = c.id === targetId;
+        });
+        syncDefaultConceptUI(false);
+        renderConceptsUI();
+        saveAppState();
+        showToast(`‘${getDefaultConcept().name}’이(가) 기본 요약 컨셉(디폴트)으로 세팅되었습니다.`);
+      });
+    });
+
+    grid.querySelectorAll("[data-concept-edit]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const targetId = btn.dataset.conceptEdit;
+        const target = state.concepts.find((c) => c.id === targetId);
+        if (!target) return;
+        document.getElementById("concept-add-title").textContent = "요약 컨셉 수정";
+        document.getElementById("concept-edit-id").value = target.id;
+        document.getElementById("concept-name").value = target.name || "";
+        document.getElementById("concept-desc").value = target.desc || "";
+        document.getElementById("concept-focus").value = target.focus || "";
+        document.getElementById("concept-audience").value = target.audience || "";
+        document.getElementById("concept-prompt").value = target.prompt || "";
+        document.getElementById("concept-error").hidden = true;
+        document.getElementById("concept-add").showModal();
+      });
+    });
+
+    grid.querySelectorAll("[data-concept-copy]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const targetId = btn.dataset.conceptCopy;
+        const target = state.concepts.find((c) => c.id === targetId);
+        if (!target) return;
+        state.concepts.push({
+          ...target,
+          id: `concept-${Date.now()}`,
+          name: `${target.name} (복사본)`,
+          badge: "복사된 컨셉",
+          badgeColor: "purple",
+          isDefault: false,
+          builtin: false
+        });
+        syncDefaultConceptUI(false);
+        renderConceptsUI();
+        saveAppState();
+        showToast(`‘${target.name}’ 요약 컨셉이 복사되었습니다.`);
+      });
+    });
+
+    grid.querySelectorAll("[data-concept-del]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        if (state.concepts.length <= 1) {
+          showToast("최소 1개의 기본 요약 컨셉은 유지되어야 합니다.");
+          return;
+        }
+        const targetId = btn.dataset.conceptDel;
+        const target = state.concepts.find((c) => c.id === targetId);
+        if (!target) return;
+        const wasDef = Boolean(target.isDefault);
+        state.concepts = state.concepts.filter((c) => c.id !== targetId);
+        if (wasDef && state.concepts.length > 0) {
+          state.concepts[0].isDefault = true;
+        }
+        syncDefaultConceptUI(false);
+        renderConceptsUI();
+        saveAppState();
+        showToast(`‘${target.name}’ 요약 컨셉이 삭제되었습니다.`);
+      });
+    });
+  }
+
+  document.querySelectorAll("[data-concept-select]").forEach((select) => {
+    if (select.id === "default-concept-select") return;
+    const currentVal = select.value;
+    select.innerHTML = getConceptOptionsHtml(currentVal);
+  });
+}
+
+document.querySelectorAll('[data-open="concept-add"]').forEach((btn) => {
+  btn.addEventListener("click", () => {
+    document.getElementById("concept-add-title").textContent = "새 요약 컨셉 생성";
+    document.getElementById("concept-edit-id").value = "";
+    document.getElementById("concept-name").value = "";
+    document.getElementById("concept-desc").value = "";
+    document.getElementById("concept-focus").value = "";
+    document.getElementById("concept-audience").value = "";
+    document.getElementById("concept-prompt").value =
+      "1. 영상 제목의 핵심 질문에 대한 원인과 해답을 중심으로 내용을 구성하세요.\n" +
+      "2. 발언자가 인용한 핵심 근거와 실제 사례·예화를 구체적으로 살려 서술하세요.\n" +
+      "3. 각 단락 끝에 삶과 현장에서 바로 실천할 적용 포인트를 제시하세요.";
+    document.getElementById("concept-error").hidden = true;
+  });
+});
+
+document.querySelectorAll("[data-concept-preset]").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const key = btn.dataset.conceptPreset;
+    const preset = CONCEPT_PRESET_PROMPTS[key];
+    if (!preset) return;
+    const nameEl = document.getElementById("concept-name");
+    if (nameEl && !nameEl.value.trim()) nameEl.value = preset.name;
+    const descEl = document.getElementById("concept-desc");
+    if (descEl) descEl.value = preset.desc;
+    const focusEl = document.getElementById("concept-focus");
+    if (focusEl) focusEl.value = preset.focus;
+    const audEl = document.getElementById("concept-audience");
+    if (audEl) audEl.value = preset.audience;
+    const promptEl = document.getElementById("concept-prompt");
+    if (promptEl) promptEl.value = preset.prompt;
+    showToast(`‘${preset.name}’ 컨셉 예시가 채워졌습니다. 원하는 대로 수정 후 저장하세요.`);
+  });
+});
+
+document.getElementById("concept-form")?.addEventListener("submit", (e) => {
+  e.preventDefault();
+  ensureConceptsState();
+  const editId = document.getElementById("concept-edit-id")?.value.trim() || "";
+  const name = document.getElementById("concept-name")?.value.trim() || "";
+  const desc = document.getElementById("concept-desc")?.value.trim() || "사용자 정의 요약 컨셉입니다.";
+  const focus = document.getElementById("concept-focus")?.value.trim() || "핵심 메시지 및 실천 원리";
+  const audience = document.getElementById("concept-audience")?.value.trim() || "개인 묵상 및 핵심 정리";
+  const prompt = document.getElementById("concept-prompt")?.value.trim() || "";
+  const errEl = document.getElementById("concept-error");
+  if (errEl) errEl.hidden = true;
+
+  const duplicate = state.concepts.some((c) => c.name === name && c.id !== editId);
+  if (!name || !prompt || duplicate) {
+    if (errEl) {
+      errEl.textContent = duplicate ? "같은 이름의 요약 컨셉이 이미 있습니다." : "요약 컨셉 이름과 상세 지침을 모두 입력해주세요.";
+      errEl.hidden = false;
+    }
+    return;
+  }
+
+  if (editId) {
+    const target = state.concepts.find((c) => c.id === editId);
+    if (target) {
+      target.name = name;
+      target.desc = desc;
+      target.focus = focus;
+      target.audience = audience;
+      target.prompt = prompt;
+      showToast(`‘${name}’ 요약 컨셉이 수정되었습니다.`);
+    }
+  } else {
+    state.concepts.push({
+      id: `concept-${Date.now()}`,
+      name,
+      badge: "✨ 나만의 요약 컨셉",
+      badgeColor: "purple",
+      desc,
+      focus,
+      audience,
+      prompt,
+      isDefault: false,
+      builtin: false
+    });
+    showToast(`새 요약 컨셉 ‘${name}’이(가) 생성되었습니다!`);
+  }
+
+  syncDefaultConceptUI(false);
+  renderConceptsUI();
+  saveAppState();
+  document.getElementById("concept-add")?.close();
 });
 
 // 5. AI Model Selection & Per-Model API Key + Connection Verification
@@ -4697,6 +5153,10 @@ document.getElementById("resume-batch-btn")?.addEventListener("click", async () 
       const select = row.querySelector("[data-template-select]");
       if (!state.templates.some(t => (t.id || "__builtin__") === entry.templateId)) throw new Error("작업 당시 서식이 삭제되었습니다. 서식을 다시 선택해 주세요.");
       select.value = entry.templateId;
+      const conSel = row.querySelector(".entry-concept-select");
+      if (conSel && entry.conceptId) {
+        conSel.value = entry.conceptId;
+      }
       const picker = row.querySelector("[data-category-picker]");
       picker.dataset.selectedCategories = JSON.stringify(entry.categories);
       picker.querySelector("[data-category-value]").textContent = entry.categories.join(", ");
@@ -4773,6 +5233,8 @@ document.getElementById("start-summary-btn")?.addEventListener("click", async ()
       const ratio = Number(el.querySelector(".entry-ratio-select")?.value || 30);
       const tplId = el.querySelector("[data-template-select]")?.value || "";
       const tplObj = tplId ? findTemplateObject(tplId) : getDefaultTemplate();
+      const conId = el.querySelector(".entry-concept-select")?.value || "";
+      const conObj = conId ? findConceptObject(conId) : getDefaultConcept();
       return {
         blockEl: el,
         index: idx + 1,
@@ -4782,7 +5244,10 @@ document.getElementById("start-summary-btn")?.addEventListener("click", async ()
         ratio,
         templateName: tplObj.name,
         templateId: tplObj.id || "__builtin__",
-        templateSections: tplObj.sections
+        templateSections: tplObj.sections,
+        conceptId: conObj.id,
+        conceptName: conObj.name,
+        conceptPrompt: conObj.prompt || ""
       };
     })
     .filter((item) => item.url.length > 0 || item.manualScript.length > 0);
@@ -4829,7 +5294,7 @@ document.getElementById("start-summary-btn")?.addEventListener("click", async ()
     return;
   }
   const inputControls = [...document.querySelectorAll(
-    "#video-entries-list input, #video-entries-list select, #video-entries-list textarea, #video-entries-list button, #add-url-btn, #reset-input-form-btn, #default-ratio-select, #apply-default-ratio-all-btn"
+    "#video-entries-list input, #video-entries-list select, #video-entries-list textarea, #video-entries-list button, #add-url-btn, #reset-input-form-btn, #default-ratio-select, #apply-default-ratio-all-btn, #default-concept-select, #apply-default-concept-all-btn"
   )].map((element) => ({element, disabled: element.disabled}));
   inputControls.forEach(({element}) => { element.disabled = true; });
 
@@ -4957,6 +5422,9 @@ document.getElementById("start-summary-btn")?.addEventListener("click", async ()
         }
       }, 1200);
 
+      const entryConceptExtra = entry.conceptPrompt
+        ? `[요약 컨셉: ${entry.conceptName}]\n${entry.conceptPrompt}`
+        : "";
       try {
         if (audioChoice.useAudio) {
           const audioRes = await runAudioSummarizationViaServer({
@@ -4967,7 +5435,8 @@ document.getElementById("start-summary-btn")?.addEventListener("click", async ()
             templateName: entry.templateName,
             customSections: entry.templateSections,
             audioBase64: audioChoice.audioBase64,
-            audioMimeType: audioChoice.audioMimeType
+            audioMimeType: audioChoice.audioMimeType,
+            conceptExtra: entryConceptExtra
           });
           summarized = audioRes;
           trData.segments = audioRes.segments || [];
@@ -4981,7 +5450,8 @@ document.getElementById("start-summary-btn")?.addEventListener("click", async ()
             entry.templateName,
             aiLabel,
             entry.templateSections,
-            entry.url
+            entry.url,
+            entryConceptExtra
           );
         }
       } catch (audioErr) {
@@ -5006,7 +5476,7 @@ document.getElementById("start-summary-btn")?.addEventListener("click", async ()
       // Step 3: Summarize transcript according to ratio & template using summarization algorithm
       setProgressStepUI(3);
       let stepPct = 60;
-      statusEl.textContent = `${aiLabel} · 요약 생성 및 요약 원본 기록 중 (${entry.ratio}%) · ${stepPct}%`;
+      statusEl.textContent = `${aiLabel} · 요약 생성 및 요약 원본 기록 중 (${entry.ratio}% · ${entry.conceptName}) · ${stepPct}%`;
       barEl.style.width = `${stepPct}%`;
       const progressTick = window.setInterval(() => {
         if (stepPct < 94) {
@@ -5015,6 +5485,9 @@ document.getElementById("start-summary-btn")?.addEventListener("click", async ()
           barEl.style.width = `${stepPct}%`;
         }
       }, 650);
+      const entryConceptExtra = entry.conceptPrompt
+        ? `[요약 컨셉: ${entry.conceptName}]\n${entry.conceptPrompt}`
+        : "";
       try {
         summarized = await runSummarizationAlgorithm(
           trData.segments,
@@ -5024,7 +5497,8 @@ document.getElementById("start-summary-btn")?.addEventListener("click", async ()
           entry.templateName,
           aiLabel,
           entry.templateSections,
-          entry.url
+          entry.url,
+          entryConceptExtra
         );
       } finally {
         window.clearInterval(progressTick);
@@ -5051,6 +5525,8 @@ document.getElementById("start-summary-btn")?.addEventListener("click", async ()
       date: dateStr,
       ratio: entry.ratio,
       template: entry.templateName,
+      concept: entry.conceptName || getDefaultConcept().name,
+      conceptPrompt: entry.conceptPrompt || getDefaultConcept().prompt || "",
       aiModel: usedEngineLabel,
       quality: summarized.quality || {notice: "오디오 결과 · 원문 인용 대조는 별도 검토가 필요합니다."},
       isNew: true,
@@ -5173,6 +5649,12 @@ function resetNewSummaryInputForm() {
       delete ratioSel.dataset.userModified;
       ratioSel.innerHTML = getRatioOptionsHtml(getDefaultRatio());
       ratioSel.value = String(getDefaultRatio());
+    }
+    const conceptSel = first.querySelector(".entry-concept-select");
+    if (conceptSel) {
+      delete conceptSel.dataset.userModified;
+      conceptSel.innerHTML = getConceptOptionsHtml("");
+      conceptSel.value = "";
     }
   }
   const progressCard = document.getElementById("summary-progress-card");
@@ -5660,6 +6142,16 @@ function renderSummaryDetail(summaryId) {
   document.getElementById("detail-channel").innerHTML = `${iconSvg("youtube")}${escapeHtml(item.channel)}`;
   document.getElementById("detail-date").innerHTML = `${iconSvg("calendar")}작업일 ${escapeHtml(item.date)}`;
   document.getElementById("detail-ratio-meta").innerHTML = `${iconSvg("sliders")}요약률 ${item.ratio}% (${escapeHtml(item.template || "기본서식")})`;
+  const itemConceptObj = findConceptObject(item.concept || "");
+  const activeConceptName = item.concept || itemConceptObj.name;
+  const conceptMetaEl = document.getElementById("detail-concept-meta");
+  if (conceptMetaEl) {
+    conceptMetaEl.innerHTML = `${iconSvg("sparkles")}컨셉: ${escapeHtml(activeConceptName)}`;
+  }
+  const conceptBadgeTextEl = document.getElementById("detail-concept-badge-text");
+  if (conceptBadgeTextEl) {
+    conceptBadgeTextEl.textContent = `컨셉: ${activeConceptName}`;
+  }
   document.getElementById("detail-ai-meta").innerHTML = `${iconSvg("sparkles")}${escapeHtml(item.aiModel || "OpenAI GPT-4o")}`;
   if (item.quality) {
     document.getElementById("detail-ai-meta").append(document.createTextNode(
@@ -5758,6 +6250,17 @@ function renderSummaryDetail(summaryId) {
   if (resumTplSelect) {
     const matchedTpl = state.templates.find((t) => t.name === item.template);
     resumTplSelect.innerHTML = getTemplateOptionsHtml(matchedTpl ? matchedTpl.id : "");
+  }
+  const resumConceptSelect = document.getElementById("detail-resum-concept");
+  const resumConceptPromptEl = document.getElementById("detail-resum-concept-prompt");
+  if (resumConceptSelect) {
+    const matchedCon = (state.concepts || []).find((c) => c.name === item.concept || c.id === item.concept);
+    resumConceptSelect.innerHTML = getConceptOptionsHtml(matchedCon ? matchedCon.id : "");
+    resumConceptSelect.value = matchedCon ? matchedCon.id : "";
+    if (resumConceptPromptEl) {
+      const effCon = matchedCon || getDefaultConcept();
+      resumConceptPromptEl.value = item.conceptPrompt || effCon.prompt || "";
+    }
   }
 }
 
@@ -6062,6 +6565,24 @@ document.getElementById("detail-ratio")?.addEventListener("input", (e) => {
   document.getElementById("detail-ratio-label").textContent = `${e.target.value}%`;
 });
 
+document.getElementById("detail-concept-badge")?.addEventListener("click", () => {
+  if (!isAdminLoggedIn()) return;
+  document.getElementById("ratio")?.showModal();
+});
+
+document.getElementById("detail-open-concepts-page-link")?.addEventListener("click", () => {
+  document.getElementById("ratio")?.close();
+});
+
+document.getElementById("detail-resum-concept")?.addEventListener("change", (e) => {
+  const chosenId = e.target.value;
+  const conObj = chosenId ? findConceptObject(chosenId) : getDefaultConcept();
+  const promptEl = document.getElementById("detail-resum-concept-prompt");
+  if (promptEl && conObj) {
+    promptEl.value = conObj.prompt || "";
+  }
+});
+
 document.getElementById("apply-ratio-btn")?.addEventListener("click", async () => {
   const item = state.summaries.find((s) => s.id === state.currentSummaryId);
   if (!item) return;
@@ -6074,6 +6595,17 @@ document.getElementById("apply-ratio-btn")?.addEventListener("click", async () =
     const newRatio = Number(document.getElementById("detail-ratio").value || 30);
     const chosenTplId = document.getElementById("detail-resum-template")?.value ?? "";
     const chosenTplObj = chosenTplId ? findTemplateObject(chosenTplId) : getDefaultTemplate();
+    const chosenConId = document.getElementById("detail-resum-concept")?.value ?? "";
+    const chosenConObj = chosenConId ? findConceptObject(chosenConId) : getDefaultConcept();
+    const editedConPrompt = (document.getElementById("detail-resum-concept-prompt")?.value || "").trim() || chosenConObj.prompt || "";
+    const extraResumCmd = document.getElementById("detail-resum-extra-prompt")?.value.trim() || "";
+    const combinedConceptAndExtra = [
+      editedConPrompt ? `[요약 컨셉: ${chosenConObj.name}]\n${editedConPrompt}` : "",
+      extraResumCmd ? `[추가 특별 요청]\n${extraResumCmd}` : ""
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+
     const overwriteEdited = Boolean(document.getElementById("detail-overwrite-edited")?.checked);
     const hadCustomEdit = item.editedHtml && item.editedHtml !== item.originalHtml;
 
@@ -6102,7 +6634,8 @@ document.getElementById("apply-ratio-btn")?.addEventListener("click", async () =
           templateName: chosenTplObj.name,
           customSections: chosenTplObj.sections,
           audioBase64: audioChoice.audioBase64,
-          audioMimeType: audioChoice.audioMimeType
+          audioMimeType: audioChoice.audioMimeType,
+          conceptExtra: combinedConceptAndExtra
         });
         if (resummarized.segments && resummarized.segments.length) {
           item.scriptSegments = resummarized.segments;
@@ -6110,7 +6643,6 @@ document.getElementById("apply-ratio-btn")?.addEventListener("click", async () =
       }
     }
     if (!resummarized) {
-      const extraResumCmd = document.getElementById("detail-resum-extra-prompt")?.value.trim() || "";
       resummarized = await runSummarizationAlgorithm(
         segs,
         item.title,
@@ -6120,11 +6652,13 @@ document.getElementById("apply-ratio-btn")?.addEventListener("click", async () =
         aiLabel,
         chosenTplObj.sections,
         item.url,
-        extraResumCmd
+        combinedConceptAndExtra
       );
     }
     item.ratio = newRatio;
     item.template = chosenTplObj.name;
+    item.concept = chosenConObj.name;
+    item.conceptPrompt = editedConPrompt;
     item.aiModel = resummarized.engine || aiLabel;
     item.quality = resummarized.quality;
     item.originalHtml = resummarized.html;
@@ -6146,7 +6680,7 @@ document.getElementById("apply-ratio-btn")?.addEventListener("click", async () =
     renderSummaryDetail(item.id);
     renderResultsLibrary();
     renderPublicView();
-    showToast(`요약률 ${newRatio}% · ${chosenTplObj.name} 설정으로 다시 요약하여 [요약 원본]에 기록했습니다.`);
+    showToast(`요약률 ${newRatio}% · 서식[${chosenTplObj.name}] · 컨셉[${chosenConObj.name}]으로 다시 요약하여 기록했습니다.`);
   } catch (error) {
     showToast(`재요약 실패: ${error.message}`);
   } finally {
@@ -7820,6 +8354,7 @@ const routeTitles = {
   input: "새 요약 만들기",
   summary: "You선생 페이지 (상세)",
   templates: "서식 설정",
+  concepts: "요약 컨셉",
   view: "You선생 공개페이지",
   github: "깃허브 등록",
   admin: "관리자 페이지"
@@ -7869,6 +8404,8 @@ function showPage() {
     renderSummaryDetail(state.currentSummaryId);
   } else if (route === "templates") {
     renderTemplatesUI();
+  } else if (route === "concepts") {
+    renderConceptsUI();
   } else if (route === "github") {
     syncGithubConfigUI();
   } else if (route === "admin") {
@@ -7897,6 +8434,7 @@ document.querySelectorAll("[data-open]").forEach((button) => {
     const adminOnlyModals = new Set([
       "categories",
       "template-add",
+      "concept-add",
       "direct-content-summarize",
       "ratio",
       "vscode-account",
@@ -7924,10 +8462,12 @@ document.querySelectorAll("[data-close]").forEach((button) => {
 renderIcons();
 document.querySelectorAll("#video-entries-list .entry-block").forEach(bindVideoEntryEvents);
 syncDefaultRatioUI(false);
+syncDefaultConceptUI(false);
 syncGithubConfigUI();
 renderAccountsUI();
 renderCategoriesUI();
 renderTemplatesUI();
+renderConceptsUI();
 renderResultsLibrary();
 renderSummaryDetail(state.currentSummaryId);
 renderPublicView();
