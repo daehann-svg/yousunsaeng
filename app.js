@@ -5773,7 +5773,7 @@ function extractPlainTextFromSummaryItem(item, basis = "summary") {
   const htmlSource = item.editedHtml || item.originalHtml || "";
   const tempDiv = document.createElement("div");
   tempDiv.innerHTML = htmlSource;
-  tempDiv.querySelectorAll(".summary-evidence, .hanaro-section-head").forEach((el) => el.remove());
+  tempDiv.querySelectorAll(".summary-evidence, .hanaro-section-head, .merged-sources-banner").forEach((el) => el.remove());
   const lines = [];
   tempDiv.querySelectorAll("h1, h2, h3, p, li").forEach((el) => {
     const txt = el.innerText.replace(/\s+/g, " ").trim();
@@ -5798,8 +5798,12 @@ function extractPlainTextFromSummaryItem(item, basis = "summary") {
   return item.excerpt || item.title || "";
 }
 
-function loadSelectedSummariesIntoNewInput(mode = "merged", basisOverride = null) {
-  const idsToUse = selectedLibraryIds.size > 0 ? [...selectedLibraryIds] : [...loadedLibrarySelectionIds];
+function loadSelectedSummariesIntoNewInput(mode = "merged", basisOverride = null, customOrderedIds = null) {
+  const idsToUse = Array.isArray(customOrderedIds) && customOrderedIds.length
+    ? [...customOrderedIds]
+    : selectedLibraryIds.size > 0
+    ? [...selectedLibraryIds]
+    : [...loadedLibrarySelectionIds];
   if (!idsToUse.length) {
     showToast("먼저 요약 라이브러리에서 새 요약으로 작성할 게시글을 체크해주세요.");
     return false;
@@ -5811,10 +5815,13 @@ function loadSelectedSummariesIntoNewInput(mode = "merged", basisOverride = null
   const basis = basisOverride || basisSelect?.value || "summary";
   if (basisSelect) basisSelect.value = basis;
 
-  // Sort selected items by ID ascending (chronological order) for natural synthesis
-  const items = state.summaries
-    .filter((s) => idsToUse.includes(s.id))
-    .sort((a, b) => Number(a.id) - Number(b.id));
+  // Preserve custom user order if provided from the merge modal, otherwise sort chronologically
+  const items =
+    Array.isArray(customOrderedIds) && customOrderedIds.length
+      ? customOrderedIds.map((id) => state.summaries.find((s) => s.id === id)).filter(Boolean)
+      : state.summaries
+          .filter((s) => idsToUse.includes(s.id))
+          .sort((a, b) => Number(a.id) - Number(b.id));
 
   if (!items.length) return false;
 
@@ -6558,7 +6565,7 @@ document.getElementById("bulk-merge-execute-btn")?.addEventListener("click", () 
 document.getElementById("bulk-merge-to-input-btn")?.addEventListener("click", () => {
   document.getElementById("bulk-merge-modal")?.close();
   const basis = document.getElementById("bulk-merge-basis-select")?.value || "summary";
-  loadSelectedSummariesIntoNewInput("merged", basis);
+  loadSelectedSummariesIntoNewInput("merged", basis, bulkMergeOrderedIds);
 });
 
 document.getElementById("bulk-new-summary-merged-btn")?.addEventListener("click", () => {
@@ -7089,8 +7096,11 @@ async function runAiEditCommandOnSummary() {
     );
 
     if (resummarized && resummarized.html) {
-      const cleanEditedHtml = String(resummarized.html || "").replace(/\[구간\s*\d+\]\s*/g, "");
       const liveItem = state.summaries.find((s) => s.id === item.id) || item;
+      const cleanEditedHtml = preserveMergedSourcesBannerIfPresent(
+        liveItem.editedHtml || liveItem.originalHtml,
+        resummarized.html
+      );
       activeVersionTab = "edited";
       document.querySelectorAll("[data-version]").forEach((tab) => {
         const isEdited = tab.dataset.version === "edited";
@@ -7346,6 +7356,16 @@ document.getElementById("detail-resum-concept")?.addEventListener("change", (e) 
   }
 });
 
+function preserveMergedSourcesBannerIfPresent(existingHtml = "", newHtml = "") {
+  const cleanNew = String(newHtml || "").replace(/\[구간\s*\d+\]\s*/g, "");
+  if (cleanNew.includes("merged-sources-banner")) return cleanNew;
+  const tempDiv = document.createElement("div");
+  tempDiv.innerHTML = String(existingHtml || "");
+  const bannerEl = tempDiv.querySelector(".merged-sources-banner");
+  if (!bannerEl) return cleanNew;
+  return bannerEl.outerHTML + cleanNew;
+}
+
 function showResummarizeResultNotification(ok, message) {
   const modalBanner = document.getElementById("detail-resum-result-banner");
   const detailBanner = document.getElementById("detail-resum-outcome-banner");
@@ -7446,8 +7466,11 @@ document.getElementById("apply-ratio-btn")?.addEventListener("click", async () =
     if (!resummarized || !resummarized.html) {
       throw new Error("생성된 요약 본문이 비어 있습니다.");
     }
-    const cleanNewHtml = String(resummarized.html || "").replace(/\[구간\s*\d+\]\s*/g, "");
     const liveItem = state.summaries.find((s) => s.id === targetSummaryId) || item;
+    const cleanNewHtml = preserveMergedSourcesBannerIfPresent(
+      liveItem.originalHtml || liveItem.editedHtml,
+      resummarized.html
+    );
     liveItem.scriptSegments = segs;
     liveItem.ratio = newRatio;
     liveItem.template = chosenTplObj.name;
