@@ -6173,6 +6173,117 @@ document.getElementById("select-all-rows")?.addEventListener("change", (e) => {
   updateBulkActionBar();
 });
 
+let bulkMergeOrderedIds = [];
+
+function stripMergeTagFromTitle(rawTitle = "") {
+  return String(rawTitle || "")
+    .replace(/^(?:\[합본\s*요약[^\]]*\]|\[통합\s*재요약[^\]]*\]|\[통합\s*요약[^\]]*\])\s*/g, "")
+    .trim();
+}
+
+function buildSmartMergedTitle(items) {
+  if (!Array.isArray(items) || !items.length) return "[합본 요약] 통합 요약";
+  const cleanTitles = items.map((it) => stripMergeTagFromTitle(it.title));
+  if (items.length === 1) {
+    return `[통합 재요약] ${cleanTitles[0]}`;
+  }
+  if (items.length === 2) {
+    return `[합본 요약 · 2편 통합] ${cleanTitles[0].slice(0, 26)} + ${cleanTitles[1].slice(0, 26)}`;
+  }
+  return `[합본 요약 · ${items.length}편 통합] ${cleanTitles[0].slice(0, 28)} 외 ${items.length - 1}편`;
+}
+
+function renderBulkMergeSelectedListUI() {
+  const items = bulkMergeOrderedIds
+    .map((id) => state.summaries.find((s) => s.id === id))
+    .filter(Boolean);
+  const listBox = document.getElementById("bulk-merge-selected-list");
+  const countLabel = document.getElementById("bulk-merge-count-label");
+  const charBadge = document.getElementById("bulk-merge-char-badge");
+  const basis = document.getElementById("bulk-merge-basis-select")?.value || "summary";
+
+  if (countLabel) {
+    countLabel.textContent = `📌 통합 대상 게시글 (${items.length}편 · 위/아래 버튼으로 순서 조정 가능)`;
+  }
+
+  let totalChars = 0;
+  const rowsHtml = items
+    .map((it, idx) => {
+      const txt = extractPlainTextFromSummaryItem(it, basis);
+      totalChars += txt.length;
+      return `
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 8px;background:#fff;border:1px solid #dce6d6;border-radius:6px">
+          <div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+            <strong>${idx + 1}. #${it.id}</strong> ${escapeHtml(it.title)}
+            <span style="color:#687864;font-size:10.5px">(${escapeHtml(it.channel)} · ${txt.length.toLocaleString()}자)</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:3px;flex-shrink:0">
+            <button type="button" class="script-action-btn secondary" data-merge-move-up="${it.id}" ${idx === 0 ? "disabled" : ""} style="padding:2px 6px;font-size:10px" title="위로 이동">▲</button>
+            <button type="button" class="script-action-btn secondary" data-merge-move-down="${it.id}" ${idx === items.length - 1 ? "disabled" : ""} style="padding:2px 6px;font-size:10px" title="아래로 이동">▼</button>
+            <button type="button" class="script-action-btn secondary" data-merge-remove="${it.id}" style="padding:2px 6px;font-size:10px;color:#b42318" title="통합 목록에서 제외">✕</button>
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+
+  if (listBox) {
+    listBox.innerHTML = rowsHtml || `<div style="color:#b42318;padding:6px">선택된 게시글이 없습니다.</div>`;
+    listBox.querySelectorAll("[data-merge-move-up]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const id = Number(btn.dataset.mergeMoveUp);
+        const pos = bulkMergeOrderedIds.indexOf(id);
+        if (pos > 0) {
+          [bulkMergeOrderedIds[pos - 1], bulkMergeOrderedIds[pos]] = [bulkMergeOrderedIds[pos], bulkMergeOrderedIds[pos - 1]];
+          renderBulkMergeSelectedListUI();
+          const titleInput = document.getElementById("bulk-merge-title-input");
+          if (titleInput && !titleInput.dataset.userEdited) {
+            const reorderedItems = bulkMergeOrderedIds.map((i) => state.summaries.find((s) => s.id === i)).filter(Boolean);
+            titleInput.value = buildSmartMergedTitle(reorderedItems);
+          }
+        }
+      });
+    });
+    listBox.querySelectorAll("[data-merge-move-down]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const id = Number(btn.dataset.mergeMoveDown);
+        const pos = bulkMergeOrderedIds.indexOf(id);
+        if (pos >= 0 && pos < bulkMergeOrderedIds.length - 1) {
+          [bulkMergeOrderedIds[pos], bulkMergeOrderedIds[pos + 1]] = [bulkMergeOrderedIds[pos + 1], bulkMergeOrderedIds[pos]];
+          renderBulkMergeSelectedListUI();
+          const titleInput = document.getElementById("bulk-merge-title-input");
+          if (titleInput && !titleInput.dataset.userEdited) {
+            const reorderedItems = bulkMergeOrderedIds.map((i) => state.summaries.find((s) => s.id === i)).filter(Boolean);
+            titleInput.value = buildSmartMergedTitle(reorderedItems);
+          }
+        }
+      });
+    });
+    listBox.querySelectorAll("[data-merge-remove]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        if (bulkMergeOrderedIds.length <= 1) {
+          showToast("최소 1개 이상의 게시글이 필요합니다.");
+          return;
+        }
+        const id = Number(btn.dataset.mergeRemove);
+        bulkMergeOrderedIds = bulkMergeOrderedIds.filter((x) => x !== id);
+        selectedLibraryIds.delete(id);
+        renderResultsLibrary();
+        renderBulkMergeSelectedListUI();
+        const titleInput = document.getElementById("bulk-merge-title-input");
+        if (titleInput && !titleInput.dataset.userEdited) {
+          const remainingItems = bulkMergeOrderedIds.map((i) => state.summaries.find((s) => s.id === i)).filter(Boolean);
+          titleInput.value = buildSmartMergedTitle(remainingItems);
+        }
+      });
+    });
+  }
+
+  if (charBadge) {
+    charBadge.textContent = `통합 원문 총 ${totalChars.toLocaleString()}자 (${basis === "script" ? "스크립트 원문 기준" : "요약본 내용 기준"})`;
+  }
+}
+
 function openBulkMergeSummarizeModal() {
   if (!selectedLibraryIds.size) {
     showToast("통합 요약할 게시글을 먼저 체크박스로 선택해주세요.");
@@ -6183,27 +6294,13 @@ function openBulkMergeSummarizeModal() {
     .sort((a, b) => Number(a.id) - Number(b.id));
   if (!items.length) return;
 
-  const listBox = document.getElementById("bulk-merge-selected-list");
-  if (listBox) {
-    listBox.innerHTML =
-      `<div style="font-weight:700;margin-bottom:5px;color:#1b3826">📌 통합 대상 게시글 (${items.length}편 · 번호순 통합)</div>` +
-      items
-        .map(
-          (it, idx) =>
-            `<div>${idx + 1}. <strong>#${it.id}</strong> ${escapeHtml(it.title)} <span style="color:#687864">(${escapeHtml(it.channel)})</span></div>`
-        )
-        .join("");
-  }
-
-  const defaultMergedTitle =
-    items.length === 1
-      ? `[통합 재요약] ${items[0].title}`
-      : items.length === 2
-      ? `[합본 요약 · 2편 통합] ${items[0].title.slice(0, 26)} + ${items[1].title.slice(0, 26)}`
-      : `[합본 요약 · ${items.length}편 통합] ${items[0].title.slice(0, 28)} 외 ${items.length - 1}편`;
+  bulkMergeOrderedIds = items.map((it) => it.id);
 
   const titleInput = document.getElementById("bulk-merge-title-input");
-  if (titleInput) titleInput.value = defaultMergedTitle;
+  if (titleInput) {
+    delete titleInput.dataset.userEdited;
+    titleInput.value = buildSmartMergedTitle(items);
+  }
 
   const catSelect = document.getElementById("bulk-merge-category-select");
   if (catSelect) {
@@ -6226,6 +6323,8 @@ function openBulkMergeSummarizeModal() {
   const conSelect = document.getElementById("bulk-merge-concept-select");
   if (conSelect) conSelect.innerHTML = getConceptOptionsHtml(getDefaultConcept().id || "");
 
+  renderBulkMergeSelectedListUI();
+
   const statusBanner = document.getElementById("bulk-merge-status-banner");
   if (statusBanner) statusBanner.hidden = true;
 
@@ -6237,9 +6336,10 @@ async function executeDirectBulkMergeSummarize() {
     showToast("현재 다른 요약 작업이 진행 중입니다. 잠시만 기다려주세요.");
     return;
   }
-  const items = state.summaries
-    .filter((s) => selectedLibraryIds.has(s.id))
-    .sort((a, b) => Number(a.id) - Number(b.id));
+  const orderedIds = bulkMergeOrderedIds.length ? bulkMergeOrderedIds : [...selectedLibraryIds];
+  const items = orderedIds
+    .map((id) => state.summaries.find((s) => s.id === id))
+    .filter(Boolean);
   if (!items.length) {
     showToast("통합할 게시글이 선택되지 않았습니다.");
     return;
@@ -6249,7 +6349,7 @@ async function executeDirectBulkMergeSummarize() {
   const statusBanner = document.getElementById("bulk-merge-status-banner");
   const mergedTitle =
     (document.getElementById("bulk-merge-title-input")?.value || "").trim() ||
-    `[합본 요약 · ${items.length}편 통합] ${items[0].title.slice(0, 28)} 외 ${items.length - 1}편`;
+    buildSmartMergedTitle(items);
   const chosenCat = document.getElementById("bulk-merge-category-select")?.value || "미정";
   const basis = document.getElementById("bulk-merge-basis-select")?.value || "summary";
   const ratio = Number(document.getElementById("bulk-merge-ratio-select")?.value || 30);
@@ -6276,7 +6376,7 @@ async function executeDirectBulkMergeSummarize() {
 
   const synthesisInstruction = [
     `[복수 게시글(${items.length}편) 1개 통합 요약 지침]`,
-    `아래 원문은 서로 연관된 ${items.length}개의 게시글(${items.map((it) => `#${it.id} ${it.title}`).join(", ")})을 하나로 모은 것입니다. 개별 글을 단순 나열하지 말고, 전체를 관통하는 핵심 주제와 논리적 흐름으로 재구성하여 1편의 완성도 높은 통합 요약본([1] 요약 + [2] 핵심)을 작성하세요.`,
+    `아래 원문은 서로 연관된 ${items.length}개의 게시글(${items.map((it) => `#${it.id} ${it.title}`).join(", ")})을 순서대로 모은 것입니다. 개별 글을 단순 나열하지 말고, 전체를 관통하는 핵심 주제와 논리적 흐름으로 재구성하여 1편의 완성도 높은 통합 요약본([1] 요약 + [2] 핵심)을 작성하세요.`,
     conObj?.prompt ? `[요약 컨셉: ${conObj.name}]\n${conObj.prompt}` : "",
     extraReq ? `[추가 특별 요청]\n${extraReq}` : ""
   ]
@@ -6315,7 +6415,23 @@ async function executeDirectBulkMergeSummarize() {
     const today = new Date();
     const dateStr = `${today.getFullYear()}.${String(today.getMonth() + 1).padStart(2, "0")}.${String(today.getDate()).padStart(2, "0")}`;
     const nextId = state.summaries.reduce((max, s) => Math.max(max, Number(s.id) || 0), 0) + 1;
-    const cleanHtml = String(summarized.html || "").replace(/\[구간\s*\d+\]\s*/g, "");
+    const rawHtml = String(summarized.html || "").replace(/\[구간\s*\d+\]\s*/g, "");
+    const sourceLinksBanner = `
+      <div class="merged-sources-banner" style="margin:0 0 18px;padding:12px 14px;border-radius:9px;background:#f4f8f1;border:1px solid #cfe0c7;font-size:12px;line-height:1.65;color:#233b2b">
+        <strong style="display:block;margin-bottom:4px;color:#1b3826">📚 통합 요약 원본 게시글 (${items.length}편 통합)</strong>
+        ${items
+          .map(
+            (it, idx) =>
+              `<div>${idx + 1}. <strong>#${it.id}</strong> ${escapeHtml(it.title)} <span style="color:#5a6b58">(${escapeHtml(it.channel)})</span> ${
+                it.url && it.url.includes("youtube")
+                  ? `<a href="${escapeHtml(it.url)}" target="_blank" rel="noopener noreferrer" style="color:#1d4ed8;text-decoration:underline;margin-left:4px">[영상 보기 ↗]</a>`
+                  : ""
+              }</div>`
+          )
+          .join("")}
+      </div>
+    `;
+    const cleanHtml = sourceLinksBanner + rawHtml;
     const usedEngineLabel = summarized.engine ? `${aiLabel} (${summarized.engine})` : aiLabel;
 
     const newSummary = {
@@ -6331,6 +6447,7 @@ async function executeDirectBulkMergeSummarize() {
       concept: conObj.name,
       conceptPrompt: conObj.prompt || "",
       lastExtraRequest: extraReq,
+      mergedSourceIds: items.map((it) => it.id),
       aiModel: usedEngineLabel,
       quality: summarized.quality || {
         method: "multi-post-merged-ai",
@@ -6410,6 +6527,24 @@ document.getElementById("results-new-summary-btn")?.addEventListener("click", (e
       loadSelectedSummariesIntoNewInput("each");
     }
   }
+});
+
+document.getElementById("bulk-merge-title-input")?.addEventListener("input", (e) => {
+  e.target.dataset.userEdited = "1";
+});
+
+document.getElementById("bulk-merge-basis-select")?.addEventListener("change", () => {
+  renderBulkMergeSelectedListUI();
+});
+
+document.querySelectorAll("[data-merge-preset]").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const input = document.getElementById("bulk-merge-extra-input");
+    if (input) {
+      input.value = btn.dataset.mergePreset || "";
+      input.focus();
+    }
+  });
 });
 
 document.getElementById("bulk-merge-summarize-now-btn")?.addEventListener("click", () => {

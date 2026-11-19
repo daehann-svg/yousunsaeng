@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#244b40">
   <title>You선생 — 영상이 지식이 되는 공간</title>
-  <link rel="stylesheet" href="styles.css">
-  <script src="state-sync.js" defer></script>
-  <script src="pending-store.js" defer></script>
-  <script src="app.js" defer></script>
+  <link rel="stylesheet" href="styles.css?v=2026112002">
+  <script src="state-sync.js?v=2026112002" defer></script>
+  <script src="pending-store.js?v=2026112002" defer></script>
+  <script src="app.js?v=2026112002" defer></script>
 </head>
 <body>
   <aside class="sidebar">
@@ -1167,7 +1167,11 @@
       <button class="icon-button" data-close aria-label="통합 요약 창 닫기"><i data-icon="x"></i></button>
     </div>
     <p class="modal-description" id="bulk-merge-modal-desc">요약 라이브러리에서 체크한 복수의 게시글을 하나로 통합하여 <strong>1개의 종합 요약 게시글</strong>로 생성하고 라이브러리에 저장합니다.</p>
-    <div id="bulk-merge-selected-list" style="max-height:135px;overflow-y:auto;padding:10px 12px;margin-bottom:12px;border-radius:9px;background:#f5f8f2;border:1px solid #d5e2ce;font-size:11.5px;line-height:1.65;color:#233b2b"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+      <strong id="bulk-merge-count-label" style="font-size:12px;color:#1b3826">📌 통합 대상 게시글 (위·아래 버튼으로 통합 순서 변경 및 개별 제외 가능)</strong>
+      <span id="bulk-merge-char-badge" class="tag tag-sage" style="font-size:10.5px">예상 원문 0자</span>
+    </div>
+    <div id="bulk-merge-selected-list" style="max-height:155px;overflow-y:auto;padding:8px 10px;margin-bottom:12px;border-radius:9px;background:#f5f8f2;border:1px solid #d5e2ce;font-size:11.5px;line-height:1.6;color:#233b2b;display:flex;flex-direction:column;gap:5px"></div>
     <div class="algo-form-grid">
       <div>
         <label class="field-label" for="bulk-merge-title-input">통합 요약 결과물 제목 <span>*</span></label>
@@ -1208,7 +1212,14 @@
       </div>
     </div>
     <div style="margin-top:10px">
-      <label class="field-label" for="bulk-merge-extra-input">✨ 통합 요약 특별 요청사항 (선택사항)</label>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;margin-bottom:5px">
+        <label class="field-label" for="bulk-merge-extra-input" style="margin:0">✨ 통합 요약 방식 및 특별 요청사항 (선택사항)</label>
+        <div style="display:flex;gap:4px;flex-wrap:wrap">
+          <button type="button" class="script-action-btn secondary" data-merge-preset="중복되는 내용은 하나로 합치고 전체를 관통하는 핵심 주제와 실천 지침으로 일목요연하게 통합해줘" style="padding:2px 7px;font-size:10.5px">주제별 중복제거 통합</button>
+          <button type="button" class="script-action-btn secondary" data-merge-preset="각 영상의 고유한 핵심 논점과 차이점을 비교·대조한 뒤 종합 결론을 도출해줘" style="padding:2px 7px;font-size:10.5px">비교·종합 분석형</button>
+          <button type="button" class="script-action-btn secondary" data-merge-preset="시리즈 순서에 따라 단계별 흐름(도입 → 심화 → 실전 적용)이 이어지도록 하나의 완성된 가이드북처럼 통합해줘" style="padding:2px 7px;font-size:10.5px">시리즈 완결 가이드북형</button>
+        </div>
+      </div>
       <input type="text" id="bulk-merge-extra-input" class="template-input" placeholder="예: 중복되는 내용은 하나로 묶고 공통 핵심 원리와 실천 지침 위주로 1편의 완성된 글로 통합해줘">
     </div>
     <div id="bulk-merge-status-banner" class="ai-conn-status" role="status" hidden style="margin-top:12px;padding:10px 12px;font-size:11.5px;line-height:1.55"></div>
