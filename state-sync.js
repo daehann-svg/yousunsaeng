@@ -82,5 +82,42 @@ const SummarySync = (() => {
       return url.href;
     });
   }
-  return {clone, equal, key, persistent, rebase, parseUrls, localKeys};
+  function preferLocalOnConflict(base, local, remote) {
+    try {
+      return rebase(base, local, remote);
+    } catch (_err) {
+      const result = clone(remote || {});
+      const ignored = new Set([...localKeys, "summaries", "_revision"]);
+      for (const name of Object.keys(local || {})) {
+        if (!ignored.has(name) && !equal((base || {})[name], local[name])) {
+          result[name] = clone(local[name]);
+        }
+      }
+      const before = new Map(((base && base.summaries) || []).map((s) => [key(s), s]));
+      const after = new Map(((local && local.summaries) || []).map((s) => [key(s), s]));
+      const merged = new Map(((remote && remote.summaries) || []).map((s) => [key(s), clone(s)]));
+      for (const [id, current] of after) {
+        const old = before.get(id);
+        if (!old || !equal(old, current)) {
+          const latest = merged.get(id);
+          if (latest) {
+            const combined = clone(latest);
+            for (const f of Object.keys(current)) {
+              if (f !== "id" && (!old || !equal(old[f], current[f]))) {
+                combined[f] = clone(current[f]);
+              }
+            }
+            merged.set(id, combined);
+          } else {
+            merged.set(id, clone(current));
+          }
+        }
+      }
+      result.summaries = [...merged.values()].sort((a, b) => b.id - a.id);
+      result._revision = (remote && remote._revision) || 0;
+      return result;
+    }
+  }
+
+  return {clone, equal, key, persistent, rebase, preferLocalOnConflict, parseUrls, localKeys};
 })();

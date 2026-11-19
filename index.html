@@ -62,8 +62,8 @@
     <main>
       <section id="results" class="page" aria-labelledby="results-title">
         <div class="page-heading">
-          <div><h1 id="results-title">요약 라이브러리<span class="title-dot">.</span></h1><p>유튜브 영상의 핵심 요약을 번호·분류별로 관리하세요.</p></div>
-          <a class="button primary" href="#input"><i data-icon="plus"></i>새 요약 만들기</a>
+          <div><h1 id="results-title">요약 라이브러리<span class="title-dot">.</span></h1><p>유튜브 영상의 핵심 요약을 번호·분류별로 관리하세요. 체크박스로 복수의 요약을 선택하면 선택한 요약만으로 새 요약을 작성할 수 있습니다.</p></div>
+          <a class="button primary" href="#input" id="results-new-summary-btn"><i data-icon="plus"></i><span id="results-new-summary-btn-label">새 요약 만들기</span></a>
         </div>
 
         <div class="library-panel">
@@ -81,6 +81,9 @@
           <div class="bulk-action-bar" id="bulk-action-bar" hidden>
             <span>선택됨 <strong id="bulk-selected-count">0</strong>개</span>
             <div class="bulk-action-controls">
+              <button type="button" class="button primary" id="bulk-merge-summarize-now-btn" title="체크한 복수의 게시글을 설정한 요약률·서식·컨셉으로 통합 요약하여 1개의 새 요약 결과물로 즉시 생성합니다"><i data-icon="sparkles"></i>선택 게시글 통합 요약 생성 (1개 결과물)</button>
+              <button type="button" class="button secondary" id="bulk-new-summary-merged-btn" title="체크한 복수의 요약본 내용을 새 요약 만들기 화면으로 불러와 편집 후 요약합니다"><i data-icon="file"></i>통합 원고 불러오기</button>
+              <button type="button" class="button secondary" id="bulk-new-summary-each-btn" title="체크한 요약본들을 개별 입력칸으로 불러와 새 요약 만들기로 작성합니다"><i data-icon="plus-square"></i>선택 요약 개별 새 요약 만들기</button>
               <select id="bulk-category-select" aria-label="일괄 변경할 분류"></select>
               <button type="button" class="button secondary" id="bulk-apply-cat-btn">일괄 분류 변경</button>
               <button type="button" class="button secondary" id="bulk-export-md-btn">선택 MD 저장</button>
@@ -104,6 +107,21 @@
           <div class="creation-main">
             <div class="form-card url-settings-card">
               <div class="card-heading"><span class="step-number">01</span><div><h2>어떤 영상을 요약할까요?</h2><p>URL 옆에서 영상별 분류, 요약률, 서식, 요약 컨셉을 각각 설정하세요.</p></div><i data-icon="link"></i></div>
+              <div id="loaded-selected-summaries-banner" hidden style="padding:12px 14px;margin-bottom:12px;border-radius:9px;background:#eef6ee;border:1px solid #b8d6b9;color:#1f3d23;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:12px">
+                <div style="display:flex;flex-direction:column;gap:4px">
+                  <strong id="loaded-selected-summaries-title" style="font-size:12.5px;color:#1a3822">📌 요약 라이브러리에서 선택한 요약본을 불러왔습니다.</strong>
+                  <span id="loaded-selected-summaries-desc" style="font-size:11px;color:#47634a">체크한 요약본들의 내용만 가지고 원하는 요약률·서식·요약 컨셉으로 새 요약을 작성합니다.</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                  <select id="loaded-source-basis-select" aria-label="불러올 원문 기준 선택" style="width:auto;height:32px;padding:4px 8px;font-size:11px;background:#fff;border:1px solid #b8d6b9;border-radius:6px;color:#1f3d23;font-weight:600">
+                    <option value="summary" selected>기준: 체크한 요약본 내용([1]요약+[2]핵심)</option>
+                    <option value="script">기준: 체크한 요약본의 추출 스크립트 원문</option>
+                  </select>
+                  <button type="button" class="button primary" id="loaded-mode-merged-btn" style="min-height:32px;padding:5px 10px;font-size:11px">합본 1건으로 통합 요약</button>
+                  <button type="button" class="button secondary" id="loaded-mode-each-btn" style="min-height:32px;padding:5px 10px;font-size:11px">개별 건별로 각각 요약</button>
+                  <button type="button" class="button secondary danger-button" id="loaded-clear-btn" style="min-height:32px;padding:5px 10px;font-size:11px">선택 불러오기 해제</button>
+                </div>
+              </div>
               <div class="default-ratio-bar" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 14px;margin-bottom:10px;background:#f5f8f2;border:1px solid #d5e2ce;border-radius:9px;font-size:12px;color:#2c432b">
                 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
                   <strong><i data-icon="sliders"></i>기본 요약률(디폴트) 설정</strong>
@@ -1008,10 +1026,10 @@
     </div>
     <label class="overwrite-edit-check" style="display:flex;align-items:center;gap:7px;margin-top:14px;font-size:11px;color:#5f7056;cursor:pointer">
       <input type="checkbox" id="detail-overwrite-edited">
-      <span>재요약 결과로 [요약 수정본]도 함께 초기화하기 (미체크 시 기존 수정본 보존)</span>
+      <span>[요약 원본]도 재요약 결과로 함께 덮어쓰기 (미체크 시 기존 [요약 원본]은 그대로 보존하고 <strong>[요약 수정본]</strong>에만 저장하여 두 버전을 비교합니다)</span>
     </label>
     <div id="detail-resum-result-banner" class="ai-conn-status" role="status" hidden style="margin-top:12px;padding:10px 12px;font-size:11.5px;line-height:1.55"></div>
-    <div class="modal-footer"><span>재요약 결과는 [요약 원본]에 즉시 기록됩니다.</span><button type="button" class="button primary" id="apply-ratio-btn"><i data-icon="sparkles"></i>다시 요약하기</button></div>
+    <div class="modal-footer"><span>재요약 결과는 기본적으로 [요약 수정본]에 기록되며 [요약 원본]은 보존됩니다.</span><button type="button" class="button primary" id="apply-ratio-btn"><i data-icon="sparkles"></i>다시 요약하기</button></div>
   </dialog>
   <dialog id="public-reader-modal" class="modal reader-modal" aria-labelledby="reader-modal-title">
     <div class="reader-modal-top">
@@ -1141,6 +1159,62 @@
     <div class="modal-footer">
       <button type="button" class="button secondary" id="audio-fallback-skip-btn">이 영상 건너뛰기 (원문 없음)</button>
       <button type="button" class="button primary" id="audio-fallback-confirm-btn"><i data-icon="volume"></i>예, 오디오로 AI 요약 진행</button>
+    </div>
+  </dialog>
+  <dialog id="bulk-merge-modal" class="modal" aria-labelledby="bulk-merge-modal-title">
+    <div class="modal-heading">
+      <div><span class="eyebrow">MULTI-POST INTEGRATED SUMMARY</span><h2 id="bulk-merge-modal-title">선택 게시글 통합 요약 생성 (1개 결과물)</h2></div>
+      <button class="icon-button" data-close aria-label="통합 요약 창 닫기"><i data-icon="x"></i></button>
+    </div>
+    <p class="modal-description" id="bulk-merge-modal-desc">요약 라이브러리에서 체크한 복수의 게시글을 하나로 통합하여 <strong>1개의 종합 요약 게시글</strong>로 생성하고 라이브러리에 저장합니다.</p>
+    <div id="bulk-merge-selected-list" style="max-height:135px;overflow-y:auto;padding:10px 12px;margin-bottom:12px;border-radius:9px;background:#f5f8f2;border:1px solid #d5e2ce;font-size:11.5px;line-height:1.65;color:#233b2b"></div>
+    <div class="algo-form-grid">
+      <div>
+        <label class="field-label" for="bulk-merge-title-input">통합 요약 결과물 제목 <span>*</span></label>
+        <input type="text" id="bulk-merge-title-input" class="template-input" placeholder="예: [통합 요약] 선택한 게시글 핵심 종합 정리" maxlength="120">
+      </div>
+      <div>
+        <label class="field-label" for="bulk-merge-category-select">저장할 분류</label>
+        <select id="bulk-merge-category-select" class="template-input"></select>
+      </div>
+    </div>
+    <div class="algo-form-grid" style="margin-top:10px">
+      <div>
+        <label class="field-label" for="bulk-merge-basis-select">통합할 원문 기준</label>
+        <select id="bulk-merge-basis-select" class="template-input">
+          <option value="summary" selected>각 게시글의 요약본 ([1] 요약 + [2] 핵심)</option>
+          <option value="script">각 게시글의 추출된 스크립트 원문 전체</option>
+        </select>
+      </div>
+      <div>
+        <label class="field-label" for="bulk-merge-ratio-select">통합 요약률</label>
+        <select id="bulk-merge-ratio-select" class="template-input">
+          <option value="10">10% (핵심 압축)</option>
+          <option value="20">20%</option>
+          <option value="30" selected>30% (표준)</option>
+          <option value="40">40%</option>
+          <option value="50">50% (상세)</option>
+          <option value="60">60%</option>
+          <option value="70">70% (심층 종합)</option>
+        </select>
+      </div>
+      <div>
+        <label class="field-label" for="bulk-merge-template-select">적용할 요약 서식</label>
+        <select id="bulk-merge-template-select" data-template-select class="template-input"></select>
+      </div>
+      <div>
+        <label class="field-label" for="bulk-merge-concept-select">적용할 요약 컨셉</label>
+        <select id="bulk-merge-concept-select" data-concept-select class="template-input"></select>
+      </div>
+    </div>
+    <div style="margin-top:10px">
+      <label class="field-label" for="bulk-merge-extra-input">✨ 통합 요약 특별 요청사항 (선택사항)</label>
+      <input type="text" id="bulk-merge-extra-input" class="template-input" placeholder="예: 중복되는 내용은 하나로 묶고 공통 핵심 원리와 실천 지침 위주로 1편의 완성된 글로 통합해줘">
+    </div>
+    <div id="bulk-merge-status-banner" class="ai-conn-status" role="status" hidden style="margin-top:12px;padding:10px 12px;font-size:11.5px;line-height:1.55"></div>
+    <div class="modal-footer" style="margin-top:14px">
+      <button type="button" class="button secondary" id="bulk-merge-to-input-btn" title="새 요약 만들기 화면으로 통합 원고를 불러와 직접 확인·수정 후 요약합니다">원고 편집 화면으로 열기</button>
+      <button type="button" class="button primary" id="bulk-merge-execute-btn"><i data-icon="sparkles"></i>1개의 통합 요약본 즉시 생성</button>
     </div>
   </dialog>
   <div class="toast" id="demo-toast" role="status" hidden><i data-icon="info"></i><span id="toast-message">처리가 완료되었습니다.</span></div>

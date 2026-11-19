@@ -1676,50 +1676,85 @@ def api_github_upload():
         files_to_upload.append(("summaries_db.json", build_sanitized_public_db_bytes()))
 
     uploaded_results = []
-    for rel_name, raw_bytes in files_to_upload:
-        remote_path = f"{subpath}/{rel_name}".strip("/") if subpath else rel_name
-        content_url = f"https://api.github.com/repos/{owner}/{repo}/contents/{remote_path}"
-        existing_sha = None
-        try:
-            r_get = requests.get(content_url, headers=headers, params={"ref": branch}, timeout=15)
-            if r_get.ok and isinstance(r_get.json(), dict):
-                existing_sha = r_get.json().get("sha")
-        except requests.RequestException:
-            existing_sha = None
+    repo_api_base = f"https://api.github.com/repos/{owner}/{repo}"
 
-        put_payload = {
-            "message": f"{commit_message} ({rel_name})",
-            "content": base64.b64encode(raw_bytes).decode("ascii"),
-            "branch": branch,
-        }
-        if existing_sha:
-            put_payload["sha"] = existing_sha
+    # Use Git Data API (Blobs -> Tree -> Commit -> Ref) so large files (summaries_db.json > 10MB) upload atomically in 1 commit
+    try:
+        r_ref = requests.get(f"{repo_api_base}/git/ref/heads/{branch}", headers=headers, timeout=15)
+        if not r_ref.ok:
+            return jsonify({"ok": False, "error": f"브랜치('{branch}') 조회 실패 (HTTP {r_ref.status_code})"}), 422
+        latest_commit_sha = (r_ref.json().get("object") or {}).get("sha")
+        r_commit = requests.get(f"{repo_api_base}/git/commits/{latest_commit_sha}", headers=headers, timeout=15)
+        if not r_commit.ok:
+            return jsonify({"ok": False, "error": f"기존 커밋 트리 조회 실패 (HTTP {r_commit.status_code})"}), 422
+        base_tree_sha = (r_commit.json().get("tree") or {}).get("sha")
 
-        try:
-            r_put = requests.put(content_url, headers=headers, json=put_payload, timeout=45)
-        except requests.RequestException as e:
-            return jsonify({
-                "ok": False,
-                "error": f"'{remote_path}' 업로드 중 네트워크 오류: {e}",
-                "uploaded": uploaded_results,
-            }), 502
+        tree_entries = []
+        for rel_name, raw_bytes in files_to_upload:
+            remote_path = f"{subpath}/{rel_name}".strip("/") if subpath else rel_name
+            r_blob = requests.post(
+                f"{repo_api_base}/git/blobs",
+                headers=headers,
+                json={"content": base64.b64encode(raw_bytes).decode("ascii"), "encoding": "base64"},
+                timeout=90,
+            )
+            if not r_blob.ok:
+                return jsonify({
+                    "ok": False,
+                    "error": f"'{remote_path}' 블롭 업로드 실패 (HTTP {r_blob.status_code})",
+                    "uploaded": uploaded_results,
+                }), 422
+            blob_sha = r_blob.json().get("sha")
+            tree_entries.append({
+                "path": remote_path,
+                "mode": "100644",
+                "type": "blob",
+                "sha": blob_sha,
+            })
+            uploaded_results.append({
+                "file": remote_path,
+                "size": len(raw_bytes),
+                "action": "updated",
+                "commitSha": "",
+            })
 
-        if not r_put.ok:
-            err_detail = r_put.json().get("message", f"HTTP {r_put.status_code}") if r_put.headers.get("content-type", "").startswith("application/json") else f"HTTP {r_put.status_code}"
-            return jsonify({
-                "ok": False,
-                "error": f"'{remote_path}' 업로드 실패: {err_detail}",
-                "uploaded": uploaded_results,
-            }), 422
+        r_tree = requests.post(
+            f"{repo_api_base}/git/trees",
+            headers=headers,
+            json={"base_tree": base_tree_sha, "tree": tree_entries},
+            timeout=30,
+        )
+        if not r_tree.ok:
+            return jsonify({"ok": False, "error": f"Git 트리 생성 실패 (HTTP {r_tree.status_code})"}), 422
+        new_tree_sha = r_tree.json().get("sha")
 
-        resp_json = r_put.json()
-        commit_sha = (resp_json.get("commit") or {}).get("sha", "")[:7]
-        uploaded_results.append({
-            "file": remote_path,
-            "size": len(raw_bytes),
-            "action": "updated" if existing_sha else "created",
-            "commitSha": commit_sha,
-        })
+        r_new_commit = requests.post(
+            f"{repo_api_base}/git/commits",
+            headers=headers,
+            json={"message": commit_message, "tree": new_tree_sha, "parents": [latest_commit_sha]},
+            timeout=30,
+        )
+        if not r_new_commit.ok:
+            return jsonify({"ok": False, "error": f"Git 커밋 생성 실패 (HTTP {r_new_commit.status_code})"}), 422
+        new_commit_sha = r_new_commit.json().get("sha") or ""
+        short_sha = new_commit_sha[:7]
+        for item in uploaded_results:
+            item["commitSha"] = short_sha
+
+        r_upd = requests.patch(
+            f"{repo_api_base}/git/refs/heads/{branch}",
+            headers=headers,
+            json={"sha": new_commit_sha, "force": False},
+            timeout=20,
+        )
+        if not r_upd.ok:
+            return jsonify({"ok": False, "error": f"브랜치 반영 실패 (HTTP {r_upd.status_code})"}), 422
+    except (requests.RequestException, ValueError) as e:
+        return jsonify({
+            "ok": False,
+            "error": f"깃허브 업로드 통신 오류: {e}",
+            "uploaded": uploaded_results,
+        }), 502
 
     repo_html_url = f"https://github.com/{owner}/{repo}"
     tree_url = f"{repo_html_url}/tree/{branch}" + (f"/{subpath}" if subpath else "")
@@ -2095,6 +2130,15 @@ class ExclusiveThreadedServer(ThreadedWSGIServer):
 
 
 if __name__ == "__main__":
+    import sys
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    os.chdir(base_dir)
+    if sys.stdout is None or sys.stderr is None:
+        log_file = open(os.path.join(base_dir, "server_autostart.log"), "a", encoding="utf-8")
+        if sys.stdout is None:
+            sys.stdout = log_file
+        if sys.stderr is None:
+            sys.stderr = log_file
     with ExclusiveThreadedServer("127.0.0.1", 8765, app) as http_server:
         print("You선생: http://127.0.0.1:8765", flush=True)
         http_server.serve_forever()

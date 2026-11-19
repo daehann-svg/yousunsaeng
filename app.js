@@ -666,8 +666,8 @@ async function summarizeYoutubeOrAudioViaBrowserGemini({
         }
       };
 
-  // Prioritize flagship high-intelligence models (gemini-2.5-flash, gemini-3.8-flash, gemini-2.5-pro) over lite models
-  const primaryModels = ["gemini-2.5-flash", "gemini-3.8-flash", "gemini-2.5-pro", "gemini-3.5-flash", "gemini-flash-latest"];
+  // Prioritize healthy, low-latency high-intelligence models (gemini-3.1-flash-lite, gemini-3.5-flash, gemini-3-flash-preview)
+  const primaryModels = ["gemini-3.1-flash-lite", "gemini-3.5-flash", "gemini-3-flash-preview", "gemini-flash-lite-latest", "gemini-3.5-flash-lite"];
 
   // PASS 1: Extract full chronological transcript & detailed sermon/lecture notes from the video/audio first
   // This prevents token starvation where 1-pass generation sacrifices summary depth.
@@ -1065,8 +1065,8 @@ async function summarizeDirectlyViaBrowserGemini(segments, title, channel, ratio
     chunks.push(fullText.slice(start, start + CHUNK_LIMIT));
   }
 
-  // High-capability Gemini models first (gemini-2.5-flash / gemini-3.8-flash / gemini-2.5-pro)
-  const models = ["gemini-2.5-flash", "gemini-3.8-flash", "gemini-2.5-pro", "gemini-3.5-flash", "gemini-flash-latest"];
+  // Healthy, fast Gemini models first (gemini-3.1-flash-lite / gemini-3.5-flash / gemini-3-flash-preview)
+  const models = ["gemini-3.1-flash-lite", "gemini-3.5-flash", "gemini-3-flash-preview", "gemini-flash-lite-latest", "gemini-3.5-flash-lite"];
 
   const callChunkModel = async (chunkText, chunkIdx, totalChunks) => {
     const chunkChapterTarget = totalChunks > 1
@@ -1432,75 +1432,24 @@ async function runSummarizationAlgorithm(segments, title, channel, ratio, templa
     }
   }
 
-  // Ignore stale recipe-specific rules on non-recipe videos so general sermon/lecture resummarization does not conflict
-  let baseTemplateRules = String(tplObj.rules || tplObj.body || "");
-  if (baseTemplateRules.includes("184개 레시피") && !String(title || "").includes("레시피")) {
-    baseTemplateRules = "";
-  }
+    // Ignore restrictive copy/no-explanation rules in 기본서식 when resummarizing or applying a concept
+    let baseTemplateRules = String(tplObj.rules || tplObj.body || "");
+    if (baseTemplateRules.includes("184개 레시피") && !String(title || "").includes("레시피")) {
+      baseTemplateRules = "";
+    }
+    if (tplObj.id === "" && baseTemplateRules.includes("스크립트 내용 100% 유지")) {
+      baseTemplateRules = "";
+    }
+    if (extraClean) {
+      baseTemplateRules = baseTemplateRules.replace(/\(서론,\s*결론,\s*중간\s*설명\s*등\s*추가\s*설명\s*금지\)/g, "");
+    }
 
   const combinedRules = extraClean
-    ? `${baseTemplateRules}\n\n[사용자 지정 요약 컨셉 및 추가 명령어 (최우선 반영)]\n${extraClean}`.trim()
+    ? `${baseTemplateRules}\n\n[사용자 지정 요약 컨셉 및 추가 특별 요청 (기존 서식 규칙보다 최우선 반영할 것)]\n${extraClean}`.trim()
     : baseTemplateRules;
 
-  const isStaticWebMode = document.body.classList.contains("static-public-mode") && location.port !== "18765";
-  if (isStaticWebMode) {
-    return await runWebBrowserSummarizationFallback({
-      segments,
-      title,
-      channel,
-      ratio: r,
-      tplObj,
-      effectiveSections,
-      extraClean,
-      aiModelLabel,
-      videoUrl
-    });
-  }
-
-  let res;
-  try {
-    res = await fetch(SUMMARIZE_API_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          signal: AbortSignal.timeout(1800000),
-          body: JSON.stringify({
-            segments,
-            title,
-            channel,
-            ratio: r,
-            customSections: effectiveSections,
-            templateType: tplObj.name || "기본서식",
-            extraCommand: extraClean,
-            apiKey: getSelectedModelApiKey(),
-            aiModel: state.selectedAiModel || "free-gemini",
-            algorithmConfig: {
-              isFreeform: Boolean(tplObj.isFreeform) || Number(tplObj.chapterCount) === 0 || String(tplObj.name || "").includes("자유") || Boolean(extraClean),
-              chapterCount: tplObj.isFreeform ? 0 : (tplObj.chapterCount ?? 11),
-              subsPerChapter: tplObj.isFreeform ? 0 : (tplObj.subsPerChapter ?? 2),
-              keypointCount: tplObj.isFreeform ? 0 : (tplObj.keypointCount ?? 16),
-              tone: tplObj.tone || "formal",
-              rules: combinedRules
-            }
-          })
-    });
-  } catch (networkErr) {
-    if (location.port === "18765") throw networkErr;
-    // Local server unreachable -> run directly in Web Browser!
-    return await runWebBrowserSummarizationFallback({
-      segments,
-      title,
-      channel,
-      ratio: r,
-      tplObj,
-      effectiveSections,
-      extraClean,
-      aiModelLabel,
-      videoUrl
-    });
-  }
-  const data = await res.json();
-  if (!res.ok || !data.ok || !Array.isArray(data.chapters) || !data.chapters.length) {
-    if (location.port !== "18765" && (!getSelectedModelApiKey() || String(data.error || "").includes("API Key"))) {
+    const isStaticWebMode = document.body.classList.contains("static-public-mode") && location.port !== "18765";
+    if (isStaticWebMode) {
       return await runWebBrowserSummarizationFallback({
         segments,
         title,
@@ -1513,8 +1462,66 @@ async function runSummarizationAlgorithm(segments, title, channel, ratio, templa
         videoUrl
       });
     }
-    throw new Error(data.error || `AI 요약 실패 (${res.status})`);
-  }
+
+    let res;
+    try {
+      res = await fetch(SUMMARIZE_API_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            signal: AbortSignal.timeout(1800000),
+            body: JSON.stringify({
+              segments,
+              title,
+              channel,
+              ratio: r,
+              customSections: effectiveSections,
+              templateType: tplObj.name || "기본서식",
+              extraCommand: extraClean,
+              apiKey: getSelectedModelApiKey() || state.modelApiKeys?.["free-gemini"] || state.apiKey || DEFAULT_GEMINI_KEY,
+              aiModel: state.selectedAiModel || "free-gemini",
+              algorithmConfig: {
+                isFreeform: Boolean(tplObj.isFreeform) || Number(tplObj.chapterCount) === 0 || String(tplObj.name || "").includes("자유") || Boolean(extraClean),
+                chapterCount: tplObj.isFreeform ? 0 : (tplObj.chapterCount ?? 11),
+                subsPerChapter: tplObj.isFreeform ? 0 : (tplObj.subsPerChapter ?? 2),
+                keypointCount: tplObj.isFreeform ? 0 : (tplObj.keypointCount ?? 16),
+                tone: tplObj.tone || "formal",
+                rules: combinedRules
+              }
+            })
+      });
+    } catch (networkErr) {
+      if (location.port === "18765") throw networkErr;
+      // Local server unreachable -> run directly in Web Browser!
+      return await runWebBrowserSummarizationFallback({
+        segments,
+        title,
+        channel,
+        ratio: r,
+        tplObj,
+        effectiveSections,
+        extraClean,
+        aiModelLabel,
+        videoUrl
+      });
+    }
+    const data = await res.json();
+    if (!res.ok || !data.ok || !Array.isArray(data.chapters) || !data.chapters.length) {
+      if (location.port !== "18765") {
+        console.warn("Server /api/summarize returned non-OK, falling back to browser summarization:", data?.error);
+        return await runWebBrowserSummarizationFallback({
+          segments,
+          title,
+          channel,
+          ratio: r,
+          tplObj,
+          effectiveSections,
+          extraClean,
+          aiModelLabel,
+          videoUrl
+        });
+      }
+      throw new Error(data.error || `AI 요약 실패 (${res.status})`);
+    }
   return {
             engine: data.engine || aiModelLabel,
             html: renderHanaroChaptersHtml(data.chapters, r, tplObj.name, data.docTitle || title),
@@ -2649,7 +2656,14 @@ function applyServerState(remote, base, submitted) {
   const currentKey = state.summaries.find((s) => s.id === state.currentSummaryId);
   const latestKey = state.summaries.find((s) => s.id === latestCreatedSummaryId);
   const localView = Object.fromEntries([...SummarySync.localKeys].map((k) => [k, state[k]]));
-  const merged = submitted ? SummarySync.rebase(submitted, state, remote) : remote;
+  let merged = remote;
+  if (submitted) {
+    try {
+      merged = SummarySync.rebase(submitted, state, remote);
+    } catch (rebaseErr) {
+      merged = SummarySync.preferLocalOnConflict(submitted, state, remote);
+    }
+  }
   Object.assign(state, merged, localView);
   stripChunkPrefixFromSummariesList(state.summaries);
   state.summaries.sort((a, b) => b.id - a.id);
@@ -2746,7 +2760,13 @@ function flushAppState() {
       }
       const data = await res.json();
       if (res.status === 409 && data.conflict && data.state) {
-        const merged = SummarySync.rebase(serverBaseline, submitted, data.state);
+        let merged;
+        try {
+          merged = SummarySync.rebase(serverBaseline, submitted, data.state);
+        } catch (conflictErr) {
+          console.warn("Auto-resolving 409 state conflict in favor of latest local edit:", conflictErr);
+          merged = SummarySync.preferLocalOnConflict(serverBaseline, submitted, data.state);
+        }
         applyServerState(merged, data.state, submitted);
         continue;
       }
@@ -2811,19 +2831,33 @@ async function syncLatestState(initial = false) {
     lastServerSyncTime = Date.now();
     document.body.classList.remove("static-public-mode");
     if (serverBaseline && (data.state._revision || 0) < (serverBaseline._revision || 0)) return;
-    let merged = initial ? data.state : SummarySync.rebase(baselineAtRead, submitted, data.state);
+    let merged;
     if (initial) {
+      merged = data.state;
       pendingRecoveryRecords = (await PendingStore.all()).filter(r => r.kind === "pending");
+      for (const record of pendingRecoveryRecords) {
+        try {
+          merged = SummarySync.rebase(record.base, record.local, merged);
+        } catch (conflictErr) {
+          // Prefer latest local edits on conflict so resummarize & editedHtml saves are never blocked
+          console.warn("Auto-resolving pending recovery conflict in favor of latest edits:", conflictErr);
+          merged = SummarySync.preferLocalOnConflict(record.base, record.local, merged);
+        }
+      }
+      recoveryBlocked = false;
+      const expBtn = document.getElementById("recovery-export-btn");
+      const disBtn = document.getElementById("recovery-discard-btn");
+      if (expBtn) expBtn.hidden = true;
+      if (disBtn) disBtn.hidden = true;
+    } else {
       try {
-        for (const record of pendingRecoveryRecords) merged = SummarySync.rebase(record.base, record.local, merged);
-      } catch (error) {
-        recoveryBlocked = true;
-        document.getElementById("recovery-export-btn").hidden = false;
-        document.getElementById("recovery-discard-btn").hidden = false;
-        throw error;
+        merged = SummarySync.rebase(baselineAtRead, submitted, data.state);
+      } catch (rebaseErr) {
+        console.warn("Auto-resolving sync rebase conflict in favor of current tab edits:", rebaseErr);
+        merged = SummarySync.preferLocalOnConflict(baselineAtRead, submitted, data.state);
       }
     }
-    applyServerState(merged, data.state, submitted);
+    applyServerState(merged, data.state, null);
     if (initial && pendingRecoveryRecords.length) {
       await journalPending();
       await flushAppState();
@@ -5394,7 +5428,15 @@ document.getElementById("start-summary-btn")?.addEventListener("click", async ()
         }
       } catch (e) {}
     } else if (entry.manualScript) {
-      const meta = entry.url ? await fetchYoutubeMetadata(entry.url) : { title: "직접 입력한 스크립트 요약", channel: "You선생 노트" };
+      const customTitle = entry.blockEl?.dataset.fetchedTitle || "";
+      const customChannel = entry.blockEl?.dataset.fetchedChannel || "";
+      const isFromLibrary = entry.blockEl?.dataset.loadedFromLibrary === "1";
+      const meta =
+        customTitle && (isFromLibrary || !entry.url)
+          ? { title: customTitle, channel: customChannel || "You선생 요약 라이브러리" }
+          : entry.url
+          ? await fetchYoutubeMetadata(entry.url)
+          : { title: customTitle || "직접 입력한 스크립트 요약", channel: customChannel || "You선생 노트" };
       const parsedSegs = parseRawScriptToSegments(entry.manualScript);
       trData = {
         ok: true,
@@ -5658,6 +5700,11 @@ function resetNewSummaryInputForm() {
     delete first.dataset.fetchedSegments;
     delete first.dataset.fetchedRawText;
     delete first.dataset.fetchedUrl;
+    delete first.dataset.fetchedTitle;
+    delete first.dataset.fetchedChannel;
+    delete first.dataset.loadedFromLibrary;
+    const loadedBanner = document.getElementById("loaded-selected-summaries-banner");
+    if (loadedBanner) loadedBanner.hidden = true;
     const statusBadge = first.querySelector("[data-script-status]");
     if (statusBadge) {
       statusBadge.textContent = "URL을 붙여넣으면 영상 제목·채널명을 자동으로 확인합니다";
@@ -5699,14 +5746,188 @@ let currentPublicPage = 1;
 const PUBLIC_PER_PAGE = 8;
 let pendingDeleteId = null;
 const selectedLibraryIds = new Set();
+let loadedLibrarySelectionIds = [];
+let loadedLibraryMode = "merged"; // "merged" or "each"
 
 function updateBulkActionBar() {
   const bar = document.getElementById("bulk-action-bar");
   const countEl = document.getElementById("bulk-selected-count");
-  if (!bar || !countEl) return;
+  const topNewBtnLabel = document.getElementById("results-new-summary-btn-label");
   const cnt = selectedLibraryIds.size;
+  if (topNewBtnLabel) {
+    topNewBtnLabel.textContent = cnt > 0 ? `선택한 ${cnt}개 요약으로 새 요약 만들기` : "새 요약 만들기";
+  }
+  if (!bar || !countEl) return;
   countEl.textContent = String(cnt);
   bar.hidden = cnt === 0;
+}
+
+function extractPlainTextFromSummaryItem(item, basis = "summary") {
+  if (!item) return "";
+  if (basis === "script" && Array.isArray(item.scriptSegments) && item.scriptSegments.length > 0) {
+    const validSegs = item.scriptSegments.filter((s) => !isGarbageScriptSegmentText(s.text));
+    if (validSegs.length > 0) {
+      return validSegs.map((s) => `[${s.time || "00:00"}] ${s.text}`).join("\n");
+    }
+  }
+  const htmlSource = item.editedHtml || item.originalHtml || "";
+  const tempDiv = document.createElement("div");
+  tempDiv.innerHTML = htmlSource;
+  tempDiv.querySelectorAll(".summary-evidence, .hanaro-section-head").forEach((el) => el.remove());
+  const lines = [];
+  tempDiv.querySelectorAll("h1, h2, h3, p, li").forEach((el) => {
+    const txt = el.innerText.replace(/\s+/g, " ").trim();
+    if (!txt || txt === "요약") return;
+    const tag = el.tagName.toLowerCase();
+    if (tag === "h1" || tag === "h2") lines.push(`\n## ${txt}`);
+    else if (tag === "h3") lines.push(`### ${txt}`);
+    else lines.push(txt);
+  });
+  if (Array.isArray(item.takeaways) && item.takeaways.length > 0) {
+    lines.push("\n[핵심 요점]");
+    item.takeaways.forEach((kp, idx) => {
+      const cleanKp = String(kp || "").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+      if (cleanKp) lines.push(`${idx + 1}. ${cleanKp}`);
+    });
+  }
+  const joined = lines.join("\n").trim();
+  if (joined) return joined;
+  if (Array.isArray(item.scriptSegments) && item.scriptSegments.length > 0) {
+    return item.scriptSegments.map((s) => `[${s.time || "00:00"}] ${s.text}`).join("\n");
+  }
+  return item.excerpt || item.title || "";
+}
+
+function loadSelectedSummariesIntoNewInput(mode = "merged", basisOverride = null) {
+  const idsToUse = selectedLibraryIds.size > 0 ? [...selectedLibraryIds] : [...loadedLibrarySelectionIds];
+  if (!idsToUse.length) {
+    showToast("먼저 요약 라이브러리에서 새 요약으로 작성할 게시글을 체크해주세요.");
+    return false;
+  }
+  loadedLibrarySelectionIds = idsToUse;
+  loadedLibraryMode = mode;
+
+  const basisSelect = document.getElementById("loaded-source-basis-select");
+  const basis = basisOverride || basisSelect?.value || "summary";
+  if (basisSelect) basisSelect.value = basis;
+
+  // Sort selected items by ID ascending (chronological order) for natural synthesis
+  const items = state.summaries
+    .filter((s) => idsToUse.includes(s.id))
+    .sort((a, b) => Number(a.id) - Number(b.id));
+
+  if (!items.length) return false;
+
+  const listEl = document.getElementById("video-entries-list");
+  if (!listEl) return false;
+  listEl.replaceChildren();
+
+  const banner = document.getElementById("loaded-selected-summaries-banner");
+  const bannerTitle = document.getElementById("loaded-selected-summaries-title");
+  const bannerDesc = document.getElementById("loaded-selected-summaries-desc");
+  const mergedBtn = document.getElementById("loaded-mode-merged-btn");
+  const eachBtn = document.getElementById("loaded-mode-each-btn");
+
+  if (banner) banner.hidden = false;
+  const idLabels = items.map((it) => `#${it.id}`).join(", ");
+  if (bannerTitle) {
+    bannerTitle.textContent =
+      mode === "merged"
+        ? `📌 체크한 ${items.length}개 요약본(${idLabels})이 [합본 1건 통합 요약] 모드로 세팅되었습니다.`
+        : `📌 체크한 ${items.length}개 요약본(${idLabels})이 [개별 ${items.length}건 요약] 모드로 세팅되었습니다.`;
+  }
+  if (bannerDesc) {
+    bannerDesc.textContent = `선택된 게시글: ${items.map((it) => `#${it.id} ${it.title.slice(0, 22)}`).join(" | ")} · 아래에서 요약률·서식·요약 컨셉을 고른 뒤 [요약 만들기]를 누르세요.`;
+  }
+  if (mergedBtn) mergedBtn.className = mode === "merged" ? "button primary" : "button secondary";
+  if (eachBtn) eachBtn.className = mode === "each" ? "button primary" : "button secondary";
+
+  if (mode === "merged") {
+    const row = createVideoEntryRow(1);
+    const combinedCats = [...new Set(items.flatMap((it) => it.categories || ["미정"]).filter((c) => c !== "미정"))];
+    const finalCats = combinedCats.length ? combinedCats : ["미정"];
+    const pickerBtn = row.querySelector("[data-category-picker]");
+    if (pickerBtn) {
+      pickerBtn.dataset.selectedCategories = JSON.stringify(finalCats);
+      const valSpan = pickerBtn.querySelector("[data-category-value]");
+      if (valSpan) valSpan.textContent = finalCats.map((c) => getCategoryNumberedLabel(c)).join(", ");
+    }
+
+    const mergedTitle =
+      items.length === 1
+        ? `${items[0].title} (재구성 요약)`
+        : items.length === 2
+        ? `[합본 요약] ${items[0].title.slice(0, 26)} + ${items[1].title.slice(0, 26)}`
+        : `[합본 요약 · ${items.length}편 통합] ${items[0].title.slice(0, 28)} 외 ${items.length - 1}편`;
+    const uniqueChannels = [...new Set(items.map((it) => it.channel).filter(Boolean))];
+    const mergedChannel = uniqueChannels.slice(0, 3).join(" · ") || "You선생 합본 요약";
+
+    const validFirstVid = extractYoutubeVideoId(items[0].url);
+    const urlInput = row.querySelector('input[type="url"]');
+    if (urlInput) {
+      urlInput.value = items.length === 1 && validFirstVid ? items[0].url : "";
+    }
+
+    const combinedScript = items
+      .map((it, idx) => {
+        const bodyTxt = extractPlainTextFromSummaryItem(it, basis);
+        return `========================================\n[선택 요약 ${idx + 1}/${items.length} · #${it.id}] 제목: ${it.title} (채널: ${it.channel})\n========================================\n${bodyTxt}`;
+      })
+      .join("\n\n");
+
+    row.dataset.loadedFromLibrary = "1";
+    row.dataset.fetchedTitle = mergedTitle;
+    row.dataset.fetchedChannel = mergedChannel;
+    const textarea = row.querySelector(".entry-script-textarea");
+    if (textarea) textarea.value = combinedScript;
+    const drawer = row.querySelector("[data-script-drawer]");
+    if (drawer) drawer.hidden = false;
+    const statusBadge = row.querySelector("[data-script-status]");
+    if (statusBadge) {
+      statusBadge.textContent = `✔ 체크한 ${items.length}개 요약본(${idLabels}) 통합 원고 세팅 완료 (${combinedScript.length.toLocaleString()}자) · 제목: ${mergedTitle}`;
+      statusBadge.classList.add("loaded");
+    }
+    listEl.appendChild(row);
+  } else {
+    items.forEach((it, idx) => {
+      const row = createVideoEntryRow(idx + 1);
+      const cats = Array.isArray(it.categories) && it.categories.length ? it.categories : ["미정"];
+      const pickerBtn = row.querySelector("[data-category-picker]");
+      if (pickerBtn) {
+        pickerBtn.dataset.selectedCategories = JSON.stringify(cats);
+        const valSpan = pickerBtn.querySelector("[data-category-value]");
+        if (valSpan) valSpan.textContent = cats.map((c) => getCategoryNumberedLabel(c)).join(", ");
+      }
+      const validVid = extractYoutubeVideoId(it.url);
+      const urlInput = row.querySelector('input[type="url"]');
+      if (urlInput) {
+        urlInput.value = validVid ? it.url : "";
+      }
+      const scriptText = extractPlainTextFromSummaryItem(it, basis);
+      row.dataset.loadedFromLibrary = "1";
+      row.dataset.fetchedTitle = it.title;
+      row.dataset.fetchedChannel = it.channel;
+      const textarea = row.querySelector(".entry-script-textarea");
+      if (textarea) textarea.value = scriptText;
+      const drawer = row.querySelector("[data-script-drawer]");
+      if (drawer) drawer.hidden = false;
+      const statusBadge = row.querySelector("[data-script-status]");
+      if (statusBadge) {
+        statusBadge.textContent = `✔ #${it.id} ‘${it.title.slice(0, 28)}’ 원고 세팅 완료 (${scriptText.length.toLocaleString()}자)`;
+        statusBadge.classList.add("loaded");
+      }
+      listEl.appendChild(row);
+    });
+  }
+
+  window.location.hash = "input";
+  showPage();
+  showToast(
+    mode === "merged"
+      ? `체크한 ${items.length}개 요약본을 합본 새 요약 만들기 입력칸으로 불러왔습니다.`
+      : `체크한 ${items.length}개 요약본을 개별 새 요약 만들기 입력칸으로 불러왔습니다.`
+  );
+  return true;
 }
 
 function renderResultsLibrary() {
@@ -5950,6 +6171,289 @@ document.getElementById("select-all-rows")?.addEventListener("change", (e) => {
     else selectedLibraryIds.delete(id);
   });
   updateBulkActionBar();
+});
+
+function openBulkMergeSummarizeModal() {
+  if (!selectedLibraryIds.size) {
+    showToast("통합 요약할 게시글을 먼저 체크박스로 선택해주세요.");
+    return;
+  }
+  const items = state.summaries
+    .filter((s) => selectedLibraryIds.has(s.id))
+    .sort((a, b) => Number(a.id) - Number(b.id));
+  if (!items.length) return;
+
+  const listBox = document.getElementById("bulk-merge-selected-list");
+  if (listBox) {
+    listBox.innerHTML =
+      `<div style="font-weight:700;margin-bottom:5px;color:#1b3826">📌 통합 대상 게시글 (${items.length}편 · 번호순 통합)</div>` +
+      items
+        .map(
+          (it, idx) =>
+            `<div>${idx + 1}. <strong>#${it.id}</strong> ${escapeHtml(it.title)} <span style="color:#687864">(${escapeHtml(it.channel)})</span></div>`
+        )
+        .join("");
+  }
+
+  const defaultMergedTitle =
+    items.length === 1
+      ? `[통합 재요약] ${items[0].title}`
+      : items.length === 2
+      ? `[합본 요약 · 2편 통합] ${items[0].title.slice(0, 26)} + ${items[1].title.slice(0, 26)}`
+      : `[합본 요약 · ${items.length}편 통합] ${items[0].title.slice(0, 28)} 외 ${items.length - 1}편`;
+
+  const titleInput = document.getElementById("bulk-merge-title-input");
+  if (titleInput) titleInput.value = defaultMergedTitle;
+
+  const catSelect = document.getElementById("bulk-merge-category-select");
+  if (catSelect) {
+    const combinedCats = [...new Set(items.flatMap((it) => it.categories || ["미정"]).filter((c) => c !== "미정"))];
+    const defaultCat = combinedCats[0] || "미정";
+    catSelect.innerHTML = state.categories
+      .map(
+        (c, i) =>
+          `<option value="${escapeHtml(c.name)}" ${c.name === defaultCat ? "selected" : ""}>${i + 1}. ${escapeHtml(c.name)}</option>`
+      )
+      .join("");
+  }
+
+  const ratioSelect = document.getElementById("bulk-merge-ratio-select");
+  if (ratioSelect) ratioSelect.value = String(getDefaultRatio() || 30);
+
+  const tplSelect = document.getElementById("bulk-merge-template-select");
+  if (tplSelect) tplSelect.innerHTML = getTemplateOptionsHtml(getDefaultTemplate().id || "");
+
+  const conSelect = document.getElementById("bulk-merge-concept-select");
+  if (conSelect) conSelect.innerHTML = getConceptOptionsHtml(getDefaultConcept().id || "");
+
+  const statusBanner = document.getElementById("bulk-merge-status-banner");
+  if (statusBanner) statusBanner.hidden = true;
+
+  document.getElementById("bulk-merge-modal")?.showModal();
+}
+
+async function executeDirectBulkMergeSummarize() {
+  if (batchRunning) {
+    showToast("현재 다른 요약 작업이 진행 중입니다. 잠시만 기다려주세요.");
+    return;
+  }
+  const items = state.summaries
+    .filter((s) => selectedLibraryIds.has(s.id))
+    .sort((a, b) => Number(a.id) - Number(b.id));
+  if (!items.length) {
+    showToast("통합할 게시글이 선택되지 않았습니다.");
+    return;
+  }
+
+  const execBtn = document.getElementById("bulk-merge-execute-btn");
+  const statusBanner = document.getElementById("bulk-merge-status-banner");
+  const mergedTitle =
+    (document.getElementById("bulk-merge-title-input")?.value || "").trim() ||
+    `[합본 요약 · ${items.length}편 통합] ${items[0].title.slice(0, 28)} 외 ${items.length - 1}편`;
+  const chosenCat = document.getElementById("bulk-merge-category-select")?.value || "미정";
+  const basis = document.getElementById("bulk-merge-basis-select")?.value || "summary";
+  const ratio = Number(document.getElementById("bulk-merge-ratio-select")?.value || 30);
+  const tplId = document.getElementById("bulk-merge-template-select")?.value || "";
+  const tplObj = tplId ? findTemplateObject(tplId) : getDefaultTemplate();
+  const conId = document.getElementById("bulk-merge-concept-select")?.value || "";
+  const conObj = conId ? findConceptObject(conId) : getDefaultConcept();
+  const extraReq = (document.getElementById("bulk-merge-extra-input")?.value || "").trim();
+
+  const uniqueChannels = [...new Set(items.map((it) => it.channel).filter(Boolean))];
+  const mergedChannel = uniqueChannels.slice(0, 3).join(" · ") || "You선생 통합 요약";
+  const combinedScript = items
+    .map((it, idx) => {
+      const bodyTxt = extractPlainTextFromSummaryItem(it, basis);
+      return `[통합 대상 ${idx + 1}/${items.length} · #${it.id} ${it.title} (${it.channel})]\n${bodyTxt}`;
+    })
+    .join("\n\n");
+
+  const mergedSegments = parseRawScriptToSegments(combinedScript);
+  if (!mergedSegments.length) {
+    showToast("선택한 게시글에서 통합할 본문 내용을 찾지 못했습니다.");
+    return;
+  }
+
+  const synthesisInstruction = [
+    `[복수 게시글(${items.length}편) 1개 통합 요약 지침]`,
+    `아래 원문은 서로 연관된 ${items.length}개의 게시글(${items.map((it) => `#${it.id} ${it.title}`).join(", ")})을 하나로 모은 것입니다. 개별 글을 단순 나열하지 말고, 전체를 관통하는 핵심 주제와 논리적 흐름으로 재구성하여 1편의 완성도 높은 통합 요약본([1] 요약 + [2] 핵심)을 작성하세요.`,
+    conObj?.prompt ? `[요약 컨셉: ${conObj.name}]\n${conObj.prompt}` : "",
+    extraReq ? `[추가 특별 요청]\n${extraReq}` : ""
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+
+  batchRunning = true;
+  if (execBtn) {
+    execBtn.disabled = true;
+    execBtn.textContent = `통합 요약 생성 중 (${items.length}편 → 1편)...`;
+  }
+  if (statusBanner) {
+    statusBanner.className = "ai-conn-status testing";
+    statusBanner.textContent = `⟳ 선택한 ${items.length}개 게시글(${combinedScript.length.toLocaleString()}자)을 하나로 통합하여 1개의 요약 결과물을 생성하고 있습니다...`;
+    statusBanner.hidden = false;
+  }
+
+  try {
+    const aiLabel = getAiModelDisplayName(state.selectedAiModel);
+    const summarized = await runSummarizationAlgorithm(
+      mergedSegments,
+      mergedTitle,
+      mergedChannel,
+      ratio,
+      tplObj.name,
+      aiLabel,
+      tplObj.sections,
+      items[0].url || "https://www.youtube.com/",
+      synthesisInstruction
+    );
+
+    if (!summarized || !summarized.html) {
+      throw new Error("통합 요약 결과가 비어 있습니다.");
+    }
+
+    const today = new Date();
+    const dateStr = `${today.getFullYear()}.${String(today.getMonth() + 1).padStart(2, "0")}.${String(today.getDate()).padStart(2, "0")}`;
+    const nextId = state.summaries.reduce((max, s) => Math.max(max, Number(s.id) || 0), 0) + 1;
+    const cleanHtml = String(summarized.html || "").replace(/\[구간\s*\d+\]\s*/g, "");
+    const usedEngineLabel = summarized.engine ? `${aiLabel} (${summarized.engine})` : aiLabel;
+
+    const newSummary = {
+      id: nextId,
+      uid: crypto.randomUUID(),
+      title: mergedTitle,
+      channel: mergedChannel,
+      url: items[0].url || "https://www.youtube.com/",
+      categories: [chosenCat],
+      date: dateStr,
+      ratio,
+      template: tplObj.name,
+      concept: conObj.name,
+      conceptPrompt: conObj.prompt || "",
+      lastExtraRequest: extraReq,
+      aiModel: usedEngineLabel,
+      quality: summarized.quality || {
+        method: "multi-post-merged-ai",
+        sourceChars: combinedScript.length,
+        notice: `${items.length}개 게시글 통합 요약 결과물`
+      },
+      isNew: true,
+      published: true,
+      bookmarked: false,
+      excerpt: summarized.excerpt,
+      scriptSegments: mergedSegments,
+      originalHtml: cleanHtml,
+      editedHtml: cleanHtml,
+      takeaways: summarized.takeaways || [],
+      outline: (summarized.outline || []).map((o) => String(o || "").replace(/^\[구간\s*\d+\]\s*/g, "").trim())
+    };
+
+    state.summaries.unshift(newSummary);
+    state.currentSummaryId = newSummary.id;
+    latestCreatedSummaryId = newSummary.id;
+    selectedLibraryIds.clear();
+    updateBulkActionBar();
+
+    saveLocalState();
+    try {
+      await flushAppState();
+    } catch (saveErr) {
+      console.warn("Merged summary flush warning (kept in local state):", saveErr);
+    }
+
+    const createdItem = state.summaries.find((s) => s.uid === newSummary.uid) || newSummary;
+    state.currentSummaryId = createdItem.id;
+    activeVersionTab = "original";
+    document.querySelectorAll("[data-version]").forEach((tab) => {
+      const isOrig = tab.dataset.version === "original";
+      tab.classList.toggle("active", isOrig);
+      tab.setAttribute("aria-selected", String(isOrig));
+    });
+
+    refreshSummaryLists();
+    renderSummaryDetail(createdItem.id);
+
+    if (statusBanner) {
+      statusBanner.className = "ai-conn-status ok";
+      statusBanner.textContent = `✔ 통합 요약 완료! #${createdItem.id} ‘${createdItem.title}’ 게시글이 생성되었습니다. 상세 페이지로 이동합니다...`;
+      statusBanner.hidden = false;
+    }
+    showToast(`선택한 ${items.length}개 게시글을 통합하여 #${createdItem.id} 요약본 1개로 생성했습니다!`);
+
+    setTimeout(() => {
+      document.getElementById("bulk-merge-modal")?.close();
+      window.location.hash = "summary";
+      showPage();
+    }, 550);
+  } catch (err) {
+    if (statusBanner) {
+      statusBanner.className = "ai-conn-status fail";
+      statusBanner.textContent = `✖ 통합 요약 생성 실패: ${err.message || "오류가 발생했습니다."}`;
+      statusBanner.hidden = false;
+    }
+    showToast(`통합 요약 실패: ${err.message}`);
+  } finally {
+    batchRunning = false;
+    if (execBtn) {
+      execBtn.disabled = false;
+      execBtn.innerHTML = `${iconSvg("sparkles")}1개의 통합 요약본 즉시 생성`;
+    }
+  }
+}
+
+document.getElementById("results-new-summary-btn")?.addEventListener("click", (e) => {
+  if (selectedLibraryIds.size > 0) {
+    e.preventDefault();
+    if (selectedLibraryIds.size >= 2) {
+      openBulkMergeSummarizeModal();
+    } else {
+      loadSelectedSummariesIntoNewInput("each");
+    }
+  }
+});
+
+document.getElementById("bulk-merge-summarize-now-btn")?.addEventListener("click", () => {
+  openBulkMergeSummarizeModal();
+});
+
+document.getElementById("bulk-merge-execute-btn")?.addEventListener("click", () => {
+  executeDirectBulkMergeSummarize();
+});
+
+document.getElementById("bulk-merge-to-input-btn")?.addEventListener("click", () => {
+  document.getElementById("bulk-merge-modal")?.close();
+  const basis = document.getElementById("bulk-merge-basis-select")?.value || "summary";
+  loadSelectedSummariesIntoNewInput("merged", basis);
+});
+
+document.getElementById("bulk-new-summary-merged-btn")?.addEventListener("click", () => {
+  loadSelectedSummariesIntoNewInput("merged");
+});
+
+document.getElementById("bulk-new-summary-each-btn")?.addEventListener("click", () => {
+  loadSelectedSummariesIntoNewInput("each");
+});
+
+document.getElementById("loaded-mode-merged-btn")?.addEventListener("click", () => {
+  loadSelectedSummariesIntoNewInput("merged");
+});
+
+document.getElementById("loaded-mode-each-btn")?.addEventListener("click", () => {
+  loadSelectedSummariesIntoNewInput("each");
+});
+
+document.getElementById("loaded-source-basis-select")?.addEventListener("change", (e) => {
+  loadSelectedSummariesIntoNewInput(loadedLibraryMode, e.target.value);
+});
+
+document.getElementById("loaded-clear-btn")?.addEventListener("click", () => {
+  loadedLibrarySelectionIds = [];
+  selectedLibraryIds.clear();
+  updateBulkActionBar();
+  const banner = document.getElementById("loaded-selected-summaries-banner");
+  if (banner) banner.hidden = true;
+  resetNewSummaryInputForm();
+  showToast("선택 요약 불러오기를 해제하고 기본 입력칸으로 초기화했습니다.");
 });
 
 document.getElementById("bulk-apply-cat-btn")?.addEventListener("click", () => {
@@ -6236,13 +6740,18 @@ function renderSummaryDetail(summaryId) {
       });
     });
   }
-  contentEl.contentEditable = "false";
-  document.getElementById("editor-toolbar").hidden = true;
-  document.getElementById("save-edit-button").hidden = true;
-  document.getElementById("cancel-edit-button").hidden = true;
+  const editorToolbarEl = document.getElementById("editor-toolbar");
+  const isCurrentlyEditing = Boolean(editorToolbarEl && !editorToolbarEl.hidden && activeVersionTab === "edited");
+
+  if (!isCurrentlyEditing) {
+    contentEl.contentEditable = "false";
+    if (editorToolbarEl) editorToolbarEl.hidden = true;
+    document.getElementById("save-edit-button").hidden = true;
+    document.getElementById("cancel-edit-button").hidden = true;
+  }
 
   const takeawaysEl = document.getElementById("detail-takeaways");
-  if (takeawaysEl) {
+  if (takeawaysEl && !isCurrentlyEditing) {
     takeawaysEl.innerHTML = renderTakeawaysListHtml(item.takeaways || []);
     takeawaysEl.contentEditable = "false";
   }
@@ -6286,6 +6795,10 @@ function renderSummaryDetail(summaryId) {
       const effCon = matchedCon || getDefaultConcept();
       resumConceptPromptEl.value = item.conceptPrompt || effCon.prompt || "";
     }
+  }
+  const resumExtraEl = document.getElementById("detail-resum-extra-prompt");
+  if (resumExtraEl && document.activeElement !== resumExtraEl && typeof item.lastExtraRequest === "string") {
+    resumExtraEl.value = item.lastExtraRequest;
   }
 }
 
@@ -6441,22 +6954,37 @@ async function runAiEditCommandOnSummary() {
     );
 
     if (resummarized && resummarized.html) {
+      const cleanEditedHtml = String(resummarized.html || "").replace(/\[구간\s*\d+\]\s*/g, "");
+      const liveItem = state.summaries.find((s) => s.id === item.id) || item;
+      activeVersionTab = "edited";
+      document.querySelectorAll("[data-version]").forEach((tab) => {
+        const isEdited = tab.dataset.version === "edited";
+        tab.classList.toggle("active", isEdited);
+        tab.setAttribute("aria-selected", String(isEdited));
+      });
       if (contentEl) {
-        contentEl.innerHTML = resummarized.html;
+        contentEl.innerHTML = cleanEditedHtml;
         contentEl.contentEditable = "true";
       }
       if (takeawaysEl && Array.isArray(resummarized.takeaways) && resummarized.takeaways.length) {
         takeawaysEl.innerHTML = renderTakeawaysListHtml(resummarized.takeaways);
         takeawaysEl.contentEditable = "true";
-        item.takeaways = resummarized.takeaways;
+        liveItem.takeaways = resummarized.takeaways;
       }
       if (Array.isArray(resummarized.outline) && resummarized.outline.length) {
-        item.outline = resummarized.outline;
+        liveItem.outline = resummarized.outline.map((o) => String(o || "").replace(/^\[구간\s*\d+\]\s*/g, "").trim());
       }
-      item.editedHtml = resummarized.html;
-      item.quality = resummarized.quality;
-      await flushAppState();
-      showToast(`AI 추가 요약 명령어(‘${extraCmd.slice(0, 24)}’)가 [요약 수정본]에 반영되었습니다!`);
+      liveItem.editedHtml = cleanEditedHtml;
+      liveItem.quality = resummarized.quality;
+      saveLocalState();
+      try {
+        await flushAppState();
+      } catch (saveErr) {
+        console.warn("AI edit flush warning:", saveErr);
+      }
+      renderResultsLibrary();
+      renderPublicView();
+      showToast(`AI 추가 요약 명령어(‘${extraCmd.slice(0, 24)}’)가 [요약 수정본]에 즉시 저장되었습니다!`);
     }
   } catch (err) {
     showToast(`AI 편집 실패: ${err.message}`);
@@ -6476,39 +7004,65 @@ document.getElementById("detail-ai-edit-prompt-input")?.addEventListener("keydow
   }
 });
 
-document.getElementById("save-edit-button")?.addEventListener("click", () => {
+document.getElementById("save-edit-button")?.addEventListener("click", async () => {
   const item = state.summaries.find((s) => s.id === state.currentSummaryId);
   if (!item) return;
-  const contentEl = document.getElementById("article-content");
-  const takeawaysEl = document.getElementById("detail-takeaways");
-  item.editedHtml = contentEl.innerHTML;
-  if (takeawaysEl) {
-    const rawInnerText = takeawaysEl.innerText || "";
-    if (rawInnerText.includes("**") || rawInnerText.includes("- ")) {
-      const parsedMd = parseRawMarkdownTakeawaysText(rawInnerText);
-      if (parsedMd.length) {
-        item.takeaways = parsedMd;
-      }
-    } else {
-      const editedTakeaways = [...takeawaysEl.querySelectorAll("li")]
-        .map((li) => li.innerHTML.trim())
-        .filter(Boolean);
-      if (editedTakeaways.length) {
-        item.takeaways = editedTakeaways;
-      } else {
-        const fallbackLines = parseRawMarkdownTakeawaysText(rawInnerText);
-        if (fallbackLines.length) item.takeaways = fallbackLines;
-      }
-    }
-    takeawaysEl.innerHTML = renderTakeawaysListHtml(item.takeaways);
+  const saveBtn = document.getElementById("save-edit-button");
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.textContent = "저장 중...";
   }
-  contentEl.contentEditable = "false";
-  if (takeawaysEl) takeawaysEl.contentEditable = "false";
-  document.getElementById("editor-toolbar").hidden = true;
-  document.getElementById("save-edit-button").hidden = true;
-  document.getElementById("cancel-edit-button").hidden = true;
-  saveAppState();
-  showToast("요약 수정본과 핵심 요점이 함께 저장되었습니다.");
+  try {
+    const contentEl = document.getElementById("article-content");
+    const takeawaysEl = document.getElementById("detail-takeaways");
+    item.editedHtml = contentEl.innerHTML;
+    if (takeawaysEl) {
+      const rawInnerText = takeawaysEl.innerText || "";
+      if (rawInnerText.includes("**") || rawInnerText.includes("- ")) {
+        const parsedMd = parseRawMarkdownTakeawaysText(rawInnerText);
+        if (parsedMd.length) {
+          item.takeaways = parsedMd;
+        }
+      } else {
+        const editedTakeaways = [...takeawaysEl.querySelectorAll("li")]
+          .map((li) => li.innerHTML.trim())
+          .filter(Boolean);
+        if (editedTakeaways.length) {
+          item.takeaways = editedTakeaways;
+        } else {
+          const fallbackLines = parseRawMarkdownTakeawaysText(rawInnerText);
+          if (fallbackLines.length) item.takeaways = fallbackLines;
+        }
+      }
+      takeawaysEl.innerHTML = renderTakeawaysListHtml(item.takeaways);
+    }
+    contentEl.contentEditable = "false";
+    if (takeawaysEl) takeawaysEl.contentEditable = "false";
+    document.getElementById("editor-toolbar").hidden = true;
+    document.getElementById("save-edit-button").hidden = true;
+    document.getElementById("cancel-edit-button").hidden = true;
+    activeVersionTab = "edited";
+    document.querySelectorAll("[data-version]").forEach((tab) => {
+      const isEdited = tab.dataset.version === "edited";
+      tab.classList.toggle("active", isEdited);
+      tab.setAttribute("aria-selected", String(isEdited));
+    });
+    saveLocalState();
+    try {
+      await flushAppState();
+    } catch (saveErr) {
+      console.warn("Save edit flush warning:", saveErr);
+    }
+    renderSummaryDetail(item.id);
+    renderResultsLibrary();
+    renderPublicView();
+    showToast("요약 수정본과 핵심 요점이 [요약 수정본]에 안전하게 저장되었습니다.");
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = `${iconSvg("check-circle")}수정본 저장`;
+    }
+  }
 });
 
 document.getElementById("detail-copy-summary-btn")?.addEventListener("click", async () => {
@@ -6677,7 +7231,9 @@ function showResummarizeResultNotification(ok, message) {
 
 document.getElementById("apply-ratio-btn")?.addEventListener("click", async () => {
   const item = state.summaries.find((s) => s.id === state.currentSummaryId);
-  if (!item) return;
+  if (!item || batchRunning) return;
+  const targetSummaryId = item.id;
+  batchRunning = true;
   const applyBtn = document.getElementById("apply-ratio-btn");
   const modalBanner = document.getElementById("detail-resum-result-banner");
   if (applyBtn) {
@@ -6705,7 +7261,6 @@ document.getElementById("apply-ratio-btn")?.addEventListener("click", async () =
       .join("\n\n");
 
     const overwriteEdited = Boolean(document.getElementById("detail-overwrite-edited")?.checked);
-    const hadCustomEdit = item.editedHtml && item.editedHtml !== item.originalHtml;
 
     let segs = (item.scriptSegments || []).filter((s) => !isGarbageScriptSegmentText(s.text));
     item.scriptSegments = segs;
@@ -6736,7 +7291,7 @@ document.getElementById("apply-ratio-btn")?.addEventListener("click", async () =
           conceptExtra: combinedConceptAndExtra
         });
         if (resummarized.segments && resummarized.segments.length) {
-          item.scriptSegments = resummarized.segments;
+          segs = resummarized.segments;
         }
       }
     }
@@ -6756,31 +7311,47 @@ document.getElementById("apply-ratio-btn")?.addEventListener("click", async () =
     if (!resummarized || !resummarized.html) {
       throw new Error("생성된 요약 본문이 비어 있습니다.");
     }
-    item.ratio = newRatio;
-    item.template = chosenTplObj.name;
-    item.concept = chosenConObj.name;
-    item.conceptPrompt = editedConPrompt;
-    item.aiModel = resummarized.engine || aiLabel;
-    item.quality = resummarized.quality;
-    item.originalHtml = String(resummarized.html || "").replace(/\[구간\s*\d+\]\s*/g, "");
-    if (!hadCustomEdit || overwriteEdited) {
-      item.editedHtml = item.originalHtml;
-    }
-    item.takeaways = resummarized.takeaways;
-    item.outline = (resummarized.outline || []).map((o) => String(o || "").replace(/^\[구간\s*\d+\]\s*/g, "").trim());
-    item.excerpt = resummarized.excerpt;
+    const cleanNewHtml = String(resummarized.html || "").replace(/\[구간\s*\d+\]\s*/g, "");
+    const liveItem = state.summaries.find((s) => s.id === targetSummaryId) || item;
+    liveItem.scriptSegments = segs;
+    liveItem.ratio = newRatio;
+    liveItem.template = chosenTplObj.name;
+    liveItem.concept = chosenConObj.name;
+    liveItem.conceptPrompt = editedConPrompt;
+    liveItem.lastExtraRequest = extraResumCmd;
+    liveItem.aiModel = resummarized.engine || aiLabel;
+    liveItem.quality = resummarized.quality;
 
-    activeVersionTab = "original";
+    // Preserve originalHtml by default and save the resummarized result into editedHtml so Original vs Edited can be compared!
+    if (!liveItem.originalHtml || overwriteEdited) {
+      liveItem.originalHtml = cleanNewHtml;
+    }
+    liveItem.editedHtml = cleanNewHtml;
+    liveItem.takeaways = resummarized.takeaways;
+    liveItem.outline = (resummarized.outline || []).map((o) => String(o || "").replace(/^\[구간\s*\d+\]\s*/g, "").trim());
+    liveItem.excerpt = resummarized.excerpt;
+
+    // Switch to 'edited' tab automatically when original is preserved so the user immediately sees the newly resummarized version
+    activeVersionTab = overwriteEdited ? "original" : "edited";
     document.querySelectorAll("[data-version]").forEach((tab) => {
-      const isOrig = tab.dataset.version === "original";
-      tab.classList.toggle("active", isOrig);
-      tab.setAttribute("aria-selected", String(isOrig));
+      const isTarget = tab.dataset.version === activeVersionTab;
+      tab.classList.toggle("active", isTarget);
+      tab.setAttribute("aria-selected", String(isTarget));
     });
-    await flushAppState();
-    renderSummaryDetail(item.id);
+    saveLocalState();
+    renderSummaryDetail(liveItem.id);
     renderResultsLibrary();
     renderPublicView();
-    const successMsg = `요약률 ${newRatio}% · 서식[${chosenTplObj.name}] · 컨셉[${chosenConObj.name}]으로 재요약 및 저장이 완료되었습니다 (${new Date().toLocaleTimeString()}).`;
+    try {
+      await flushAppState();
+      renderSummaryDetail(liveItem.id);
+      renderResultsLibrary();
+      renderPublicView();
+    } catch (saveErr) {
+      console.warn("Resummarize flush warning (kept in local state):", saveErr);
+    }
+    const targetTabName = overwriteEdited ? "[요약 원본 + 요약 수정본]" : "[요약 수정본] (원본 보존)";
+    const successMsg = `요약률 ${newRatio}% · 서식[${chosenTplObj.name}] · 컨셉[${chosenConObj.name}]${extraResumCmd ? ` · 특별요청[${extraResumCmd.slice(0, 22)}]` : ""} 결과가 ${targetTabName}에 저장되었습니다 (${new Date().toLocaleTimeString()}).`;
     showResummarizeResultNotification(true, successMsg);
     setTimeout(() => {
       const modal = document.getElementById("ratio");
@@ -6790,6 +7361,7 @@ document.getElementById("apply-ratio-btn")?.addEventListener("click", async () =
     const failMsg = `${error.message || "알 수 없는 오류가 발생했습니다."} (${new Date().toLocaleTimeString()})`;
     showResummarizeResultNotification(false, failMsg);
   } finally {
+    batchRunning = false;
     if (applyBtn) {
       applyBtn.disabled = false;
       applyBtn.innerHTML = `${iconSvg("sparkles")}다시 요약하기`;
