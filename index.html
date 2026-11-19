@@ -816,38 +816,143 @@
                 </div>
               </div>
 
-              <!-- 3. 관리자 페이지 하단: 주요 기능 간략 안내 -->
-        <div class="form-card admin-features-summary-card" aria-label="You선생 주요 기능 안내">
-          <div class="card-heading" style="margin-bottom:16px">
-            <span class="step-number"><i data-icon="sparkles"></i></span>
-            <div>
-              <h2>You선생 주요 기능 안내</h2>
-              <p>관리자 로그인 시 활성화되는 핵심 요약·관리·배포 기능 요약입니다.</p>
-            </div>
-          </div>
-          <div class="admin-features-grid">
-            <div class="admin-feature-item">
-              <strong>1. AI 유튜브 · 원고 요약 및 웹 저장</strong>
-              <p>유튜브 URL(자막·무자막 오디오 분석) 및 설교문·텍스트를 요약률(10~70%)에 맞춰 요약하고 로컬·GitHub 클라우드 DB에 자동 저장합니다.</p>
-            </div>
-            <div class="admin-feature-item">
-              <strong>2. 요약 라이브러리 · 분류 드래그 관리</strong>
-              <p>번호·분류별 검색, 중복 정리, JSON 백업·복원, 드래그 앤 드롭(모바일 터치·버튼 지원)을 통한 분류 순서 변경을 지원합니다.</p>
-            </div>
-            <div class="admin-feature-item">
-              <strong>3. 맞춤 요약 서식 · AI 추가 편집</strong>
-              <p>기본서식, Bullet형, 리포트형, 자유형식(Free-form) 설정 및 상세 페이지 내 AI 추가 명령어 편집·내보내기(MD/TXT/PDF)를 제공합니다.</p>
-            </div>
-            <div class="admin-feature-item">
-              <strong>4. 공개페이지 · TTS 낭독 · 카톡 공유</strong>
-              <p>비로그인 방문자에게 읽기 전용 공개페이지만 노출하며, PC·모바일 문단 터치 TTS 음성 듣기와 카카오톡 제목·웹링크 전달을 지원합니다.</p>
-            </div>
-            <div class="admin-feature-item">
-              <strong>5. 깃허브 원클릭 업로드 · 통신 점검</strong>
-              <p>You선생 소스 코드와 공개 요약 DB를 GitHub 저장소 및 GitHub Pages 웹 주소로 자동 배포하고 실시간 통신 상태를 점검합니다.</p>
-            </div>
-          </div>
-        </div>
+              <!-- 3. 관리자 페이지 하단: 핵심 용어 안내 및 카테고리(메뉴)별 상세 사용법 -->
+              <div class="form-card admin-glossary-card" id="admin-glossary-guide-card" aria-label="You선생 핵심 용어 안내">
+                <div class="card-heading" style="margin-bottom:16px">
+                  <span class="step-number">05</span>
+                  <div>
+                    <h2>You선생 핵심 용어 안내 (Glossary)</h2>
+                    <p>요약 생성·편집·보관·배포 과정에서 자주 사용되는 핵심 개념과 용어 설명입니다.</p>
+                  </div>
+                  <i data-icon="info"></i>
+                </div>
+                <div class="admin-features-grid" style="grid-template-columns:repeat(auto-fit,minmax(265px,1fr));gap:12px">
+                  <div class="admin-feature-item" style="border-left:3px solid #284e40">
+                    <strong>1. 요약 서식 (Template) vs 요약 컨셉 (Concept)</strong>
+                    <p style="margin-top:4px">
+                      • <strong>요약 서식 (글의 외형 틀)</strong>: 대주제(<code>##</code>)·소주제(<code>###</code>)·핵심(<code>[2] 핵심</code>)의 개수와 문단 형태(기본서식, Bullet형, 리포트형, 자유형식)를 결정합니다.<br>
+                      • <strong>요약 컨셉 (내용 구성 관점)</strong>: 서식과 별개로 원문에서 <em>어떤 초점·관점·독자 눈높이</em>(예: 설교 핵심원리, 예화·간증 중심, 소그룹 나눔·기도제목, 팩트 보존)로 내용을 발췌하고 해석할지 결정합니다.
+                    </p>
+                  </div>
+                  <div class="admin-feature-item" style="border-left:3px solid #4c7c59">
+                    <strong>2. 요약 원본 vs 요약 수정본 vs 추출 스크립트 원문</strong>
+                    <p style="margin-top:4px">
+                      • <strong>요약 원본</strong>: 최초 요약 생성 시 기록되는 기준 요약본으로, 이후 재요약이나 편집을 해도 안전하게 보존됩니다.<br>
+                      • <strong>요약 수정본</strong>: <code>[재요약]</code>, <code>[AI 추가 요약 명령어]</code>, <code>[내용·핵심 수정]</code> 결과가 저장되는 최종본이며 공개페이지에 우선 노출됩니다.<br>
+                      • <strong>추출된 스크립트 원문</strong>: 유튜브 자막이나 직접 입력한 타임스탬프 원문이며, 시간 배지 클릭 시 우측 영상이 해당 위치로 이동합니다.
+                    </p>
+                  </div>
+                  <div class="admin-feature-item" style="border-left:3px solid #b45309">
+                    <strong>3. 요약률 (10% ~ 70%) 및 구간 분할 (Chunking)</strong>
+                    <p style="margin-top:4px">
+                      • <strong>요약률</strong>: 원문 글자수 대비 목표 요약 상세도입니다. 높을수록(50~70%) 대주제·소주제·핵심 요점 수와 문단 길이가 풍부해집니다.<br>
+                      • <strong>24,000자 자동 분할(Chunking)</strong>: 장편 설교·강연(3만~10만 자)도 중간 생략 없이 24,000자 단위로 정밀 분석한 뒤 하나로 자연스럽게 병합합니다.
+                    </p>
+                  </div>
+                  <div class="admin-feature-item" style="border-left:3px solid #7c5cbf">
+                    <strong>4. 선택 게시글 통합 요약 (합본 요약 1개 결과물)</strong>
+                    <p style="margin-top:4px">
+                      • 요약 라이브러리에서 복수의 게시글을 체크한 뒤, 각 글의 <strong>요약본 내용</strong> 또는 <strong>스크립트 원문</strong>을 하나로 합쳐 전체를 관통하는 <strong>1개의 새로운 종합 요약 게시글</strong>로 생성하는 기능입니다.<br>
+                      • 생성된 통합 요약본 상단에는 원본 게시글들의 출처 배너와 영상 바로가기 링크가 자동으로 기록됩니다.
+                    </p>
+                  </div>
+                  <div class="admin-feature-item" style="border-left:3px solid #3b76a8">
+                    <strong>5. 원문 근거 보기 (Evidence) 및 무자막 오디오 분석</strong>
+                    <p style="margin-top:4px">
+                      • <strong>원문 근거 보기</strong>: AI가 지어내지(환각) 않도록 각 소제목 본문 아래에 실제 원문에서 발췌한 근거 구절을 연결해 검증합니다.<br>
+                      • <strong>무자막 오디오 AI 분석</strong>: 자막이 없는 유튜브 라이브·설교 영상의 오디오 스트림(또는 첨부 오디오 파일)을 Gemini 멀티모달 AI가 직접 듣고 요약합니다.
+                    </p>
+                  </div>
+                  <div class="admin-feature-item" style="border-left:3px solid #6b7280">
+                    <strong>6. 관리자 암호화 볼트 (Encrypted Admin Vault) &amp; PAT</strong>
+                    <p style="margin-top:4px">
+                      • <strong>PAT (Personal Access Token)</strong>: GitHub 저장소에 소스 및 <code>summaries_db.json</code>을 자동 업로드하기 위한 인증 토큰(<code>ghp_...</code> / <code>gho_...</code>)입니다.<br>
+                      • <strong>암호화 볼트</strong>: 공개 DB에는 API 키를 빈 값으로 마스킹하되, 관리자 패스워드 기반 암호화 볼트에 보관하여 웹/모바일에서도 관리자 로그인 시 키가 자동 복원됩니다.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-card admin-category-usage-card" id="admin-category-usage-guide-card" aria-label="카테고리(메뉴)별 상세 사용법">
+                <div class="card-heading" style="margin-bottom:16px">
+                  <span class="step-number">06</span>
+                  <div>
+                    <h2>카테고리(메뉴)별 상세 사용법 가이드</h2>
+                    <p>좌측 사이드바의 7개 카테고리(메뉴)별 핵심 기능과 단계별 실전 사용 방법입니다.</p>
+                  </div>
+                  <i data-icon="layers"></i>
+                </div>
+                <div class="admin-features-grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px">
+                  <div class="admin-feature-item">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:4px">
+                      <strong>① 요약 라이브러리 (<code>#results</code>)</strong>
+                      <a href="#results" class="text-button" style="font-size:11px;color:#284e40;font-weight:700">바로 이동 →</a>
+                    </div>
+                    <p>
+                      • <strong>분류 필터·검색·정렬</strong>: 상단 분류 탭과 검색창으로 게시글을 찾고, <code>[내 분류 관리]</code>에서 드래그(≡)나 위·아래 버튼으로 분류 순서를 변경합니다.<br>
+                      • <strong>복수 선택 통합 요약 (1개 결과물)</strong>: 게시글 좌측 체크박스를 2개 이상 선택 → 상단 <code>[✨ 선택 게시글 통합 요약 생성 (1개 결과물)]</code> 클릭 → 모달에서 순서(▲/▼)·제목·원문 기준·서식·컨셉 확인 후 <code>[1개의 통합 요약본 즉시 생성]</code>을 누르면 1편의 종합 요약본이 생성됩니다.<br>
+                      • <strong>일괄 관리·백업</strong>: 체크박스 선택 후 일괄 분류 변경, 선택 MD 저장, 선택 삭제 및 상단 <code>[중복 게시글 정리]</code>, <code>[JSON 백업/복원]</code>을 실행할 수 있습니다.
+                    </p>
+                  </div>
+
+                  <div class="admin-feature-item">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:4px">
+                      <strong>② 새 요약 만들기 (<code>#input</code>)</strong>
+                      <a href="#input" class="text-button" style="font-size:11px;color:#284e40;font-weight:700">바로 이동 →</a>
+                    </div>
+                    <p>
+                      • <strong>유튜브 URL 및 다중 추가</strong>: URL 입력칸에 링크를 붙여넣고 우측에서 <code>분류 · 요약률 · 요약 서식 · 요약 컨셉</code>을 지정합니다. <code>[+ URL 추가하기]</code>로 여러 영상을 한 번에 배치 요약할 수 있습니다.<br>
+                      • <strong>자막 확인 및 직접 입력</strong>: <code>[유튜브 자막·스크립트 자동 불러오기]</code>로 원문을 미리 확인하거나, <code>[스크립트 확인 / 직접 붙여넣기]</code>에 설교문·레시피 원고를 직접 붙여넣어 요약할 수 있습니다.<br>
+                      • <strong>무자막 영상 오디오 요약</strong>: 자막이 없는 영상은 요약 시작 시 오디오 추출 또는 음성 파일(<code>.mp3/.m4a/.wav</code>) 업로드 안내창이 자동으로 열립니다.
+                    </p>
+                  </div>
+
+                  <div class="admin-feature-item">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:4px">
+                      <strong>③ 서식 설정 (<code>#templates</code>)</strong>
+                      <a href="#templates" class="text-button" style="font-size:11px;color:#284e40;font-weight:700">바로 이동 →</a>
+                    </div>
+                    <p>
+                      • <strong>정형 서식 관리</strong>: <code>기본서식</code>, <code>핵심 bullet형</code>, <code>리포트형</code>의 대주제(<code>##</code>)·소주제(<code>###</code>)·핵심 요점 개수를 조정하고 <code>[기본 서식으로 세팅]</code>할 수 있습니다.<br>
+                      • <strong>✨ 자유형식(Free-form) 모드</strong>: <code>[새 서식 추가생성]</code>에서 <code>자유형식 모드</code>를 체크하면 고정된 번호·개수 제한 없이 에세이형, Q&amp;A형, 묵상·기도제목형 등 내가 작성한 양식 그대로 출력하도록 설정할 수 있습니다.
+                    </p>
+                  </div>
+
+                  <div class="admin-feature-item">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:4px">
+                      <strong>④ 요약 컨셉 (<code>#concepts</code>)</strong>
+                      <a href="#concepts" class="text-button" style="font-size:11px;color:#284e40;font-weight:700">바로 이동 →</a>
+                    </div>
+                    <p>
+                      • <strong>내용 발췌·해석 방향 설정</strong>: 동일한 서식이라도 <em>설교 영적원리 중심</em>, <em>예화·간증 스토리 중심</em>, <em>소그룹 나눔·기도제목 중심</em>, <em>일반 비즈니스 인사이트 중심</em>, <em>원문 팩트 보존형</em> 등 어떤 관점으로 내용을 뽑아낼지 관리합니다.<br>
+                      • 자주 쓰는 컨셉을 <code>[기본 컨셉(디폴트)으로 세팅]</code>해 두면 모든 신규 요약에 자동 적용됩니다.
+                    </p>
+                  </div>
+
+                  <div class="admin-feature-item">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:4px">
+                      <strong>⑤ You선생 상세 페이지 (<code>#summary</code>)</strong>
+                      <a href="#summary" class="text-button" style="font-size:11px;color:#284e40;font-weight:700">바로 이동 →</a>
+                    </div>
+                    <p>
+                      • <strong>재요약 및 원본 비교</strong>: <code>[재요약 · 요약률 변경]</code>에서 요약률·서식·컨셉·특별 요청을 바꿔 다시 요약하면, <code>[요약 원본]</code>은 그대로 보존되고 <code>[요약 수정본]</code>에 새 결과가 저장되어 두 버전을 비교할 수 있습니다.<br>
+                      • <strong>내용·핵심 수정 및 AI 편집 명령어</strong>: <code>[내용·핵심 수정]</code> 클릭 시 본문과 핵심을 직접 타이핑해 고치거나, 상단 <code>AI 추가 요약 · 편집 명령어</code> 입력창(및 프리셋 버튼)으로 즉시 다듬은 뒤 <code>[수정본 저장]</code>을 누릅니다.<br>
+                      • <strong>TTS 낭독·내보내기·공유</strong>: 문단 클릭 즉시 TTS 음성 낭독이 시작되며, <code>[내보내기 ▾]</code>(클립보드 복사, MD, TXT, 인쇄/PDF)와 <code>[카톡 전송]</code>을 지원합니다.
+                    </p>
+                  </div>
+
+                  <div class="admin-feature-item">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:4px">
+                      <strong>⑥ You선생 공개페이지 (<code>#view</code>) &amp; ⑦ 깃허브 등록 (<code>#github</code>)</strong>
+                      <a href="#github" class="text-button" style="font-size:11px;color:#284e40;font-weight:700">깃허브 이동 →</a>
+                    </div>
+                    <p>
+                      • <strong>You선생 공개페이지 (<code>#view</code>)</strong>: 일반 독자·성도들에게 공유되는 깔끔한 읽기 전용 페이지입니다. 분류별 조회, 즐겨찾기, 리더 모달 내 문단 터치 TTS 듣기, 카카오톡 공유를 제공합니다.<br>
+                      • <strong>깃허브 등록 (<code>#github</code>)</strong>: <code>[웹 로그인 자동인증]</code> 또는 PAT 토큰으로 GitHub 계정을 연동한 뒤 <code>[You선생 소스 자동 업로드 실행]</code>을 누르면 웹 주소(<code>github.io</code>)로 최신 코드와 요약 DB가 원클릭 배포됩니다.
+                    </p>
+                  </div>
+                </div>
+              </div>
       </section>
     </main>
   </div>
