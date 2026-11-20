@@ -1072,16 +1072,19 @@ async function summarizeDirectlyViaBrowserGemini(segments, title, channel, ratio
     const chunkChapterTarget = totalChunks > 1
       ? Math.max(3, Math.ceil(chapterCount / totalChunks))
       : chapterCount;
+    const itemSeparationRule = `- [★ 다중 항목(N가지 방법·방식·이유·질문·원리·단계) 개별 분리 절대 규칙 ★]: 원문에 'N가지 방법/방식/이유/질문/원리/단계'(예: 5가지 방법, 4가지 질문, 첫째·둘째·셋째...)가 나오면 절대 하나의 소제목(subs) 본문(body) 안에 '1. ... 2. ... 3. ...' 형태로 여러 항목을 묶어서 통합 요약하지 마세요. 반드시 해당 주제를 대주제(chapter)로 세우고, 그 아래 소제목(subs)을 항목 개수만큼('1. 첫 번째 방법: ...', '2. 두 번째 방법: ...' 등 N개) 1개씩 독립된 소제목으로 분리하여 각 항목마다 원문의 근거·예화·설명을 3~4문장으로 상세히 개별 서술하세요.`;
     const sysPrompt = isFreeform
       ? `당신은 설교·강연 원문을 가장 깊이 있고 충실한 아티클로 요약하는 수석 에디터입니다.
 원문에 없는 사실·성경 구절·예화를 지어내지 말고, 원문에 등장하는 모든 성경 구절·실제 예화·핵심 논리·적용점을 빠짐없이 깊이 있게 반영하세요.${rulesNote}
+${itemSeparationRule}
 - 각 소제목 본문(body)은 표면적인 요약을 피하고 최소 4~6문장(220자 이상)의 밀도 높은 정중체(~합니다) 문단으로 서술하세요.
 - 각 소제목의 evidence 배열에는 원문에서 그대로 발췌한 근거 구절을 1~2개 포함하세요.
 ${kpRuleText}`
       : `당신은 설교·강연 원문을 가장 깊이 있고 충실한 아티클로 요약하는 수석 에디터입니다.
 원문에 충실하게 분석하여 지정된 JSON 스키마로만 응답하세요.${rulesNote}
 - 단순 나열이 아니라 영상 제목의 핵심 주제('${cleanTitleTheme}')를 중심축으로 삼고, 원문 앞·중간·끝에 등장하는 성경 구절·배경·실제 예화·핵심 원리·삶의 결단을 빠짐없이 담으세요.
-- [1] 요약(chapters): 이 구간을 ${chunkChapterTarget}개 대주제로 나누고, 각 대주제 아래 소제목(subs) ${subsPerChapter}~3개를 둔 뒤, 각 본문(body)을 **정중체('~합니다.', '~야 합니다.')로 완결된 4~6문장(최소 220자 이상)**으로 깊이 있게 작성하세요.
+${itemSeparationRule}
+- [1] 요약(chapters): 이 구간을 ${chunkChapterTarget}개 대주제로 나누고, 각 대주제 아래 소제목(subs) ${subsPerChapter}~5개를 둔 뒤, 각 본문(body)을 **정중체('~합니다.', '~야 합니다.')로 완결된 4~6문장(최소 220자 이상)**으로 깊이 있게 작성하세요.
 - 각 소제목의 evidence 배열에는 원문에서 그대로 인용한 문장을 1~2개 넣으세요.
 ${kpRuleText}`;
 
@@ -1973,7 +1976,81 @@ const C7FCAC813ACE1D68_PRESET = {
   ]
 };
 
+function expandMergedNumberedSubsInBrowser(chapters = []) {
+  if (!Array.isArray(chapters)) return [];
+  const ordMap = {
+    "첫째": "1", "둘째": "2", "셋째": "3", "넷째": "4", "다섯째": "5", "여섯째": "6", "일곱째": "7",
+    "첫 번째": "1", "두 번째": "2", "세 번째": "3", "네 번째": "4", "다섯 번째": "5", "여섯 번째": "6", "일곱 번째": "7"
+  };
+  return chapters.map((ch) => {
+    if (!ch || !Array.isArray(ch.subs)) return ch;
+    const expandedSubs = [];
+    for (const sub of ch.subs) {
+      const body = String(sub?.body || "").trim();
+      if (!body) {
+        expandedSubs.push(sub);
+        continue;
+      }
+      // Pattern A: "1. 말씀: 설명... 2. 다른 사람: 설명..."
+      const numRegex = /(?:^|\s)(\d+)\.\s*([^:\n.]{1,28})\s*:\s*/g;
+      const numMatches = [...body.matchAll(numRegex)];
+      if (numMatches.length >= 2) {
+        for (let i = 0; i < numMatches.length; i++) {
+          const m = numMatches[i];
+          const numStr = m[1];
+          const itemHead = m[2].trim();
+          const startPos = m.index + m[0].length;
+          const endPos = i + 1 < numMatches.length ? numMatches[i + 1].index : body.length;
+          const itemBody = body.slice(startPos, endPos).trim();
+          if (itemBody) {
+            expandedSubs.push({
+              ...sub,
+              code: "",
+              title: `${numStr}. ${itemHead}`,
+              body: itemBody,
+              bullets: [itemBody]
+            });
+          }
+        }
+        continue;
+      }
+      // Pattern B: "첫째는 ... 입니다. 둘째는 ... 입니다."
+      const ordRegex = /(?:^|(?<=[.?!])\s+)(첫째|둘째|셋째|넷째|다섯째|여섯째|일곱째|첫\s*번째|두\s*번째|세\s*번째|네\s*번째|다섯\s*번째)(?:는|로|로는|,|\s)\s*/g;
+      const ordMatches = [...body.matchAll(ordRegex)];
+      if (ordMatches.length >= 2) {
+        for (let i = 0; i < ordMatches.length; i++) {
+          const m = ordMatches[i];
+          const ordWord = m[1].replace(/\s+/g, " ").trim();
+          const numStr = ordMap[ordWord] || String(i + 1);
+          const startPos = m.index;
+          const endPos = i + 1 < ordMatches.length ? ordMatches[i + 1].index : body.length;
+          const segText = body.slice(startPos, endPos).trim();
+          const firstSent = segText.split(/(?<=[.?!])\s+/)[0] || segText;
+          let shortHead = firstSent
+            .replace(/^(?:\s*)(?:첫째|둘째|셋째|넷째|다섯째|여섯째|일곱째|첫\s*번째|두\s*번째|세\s*번째|네\s*번째|다섯\s*번째)(?:는|로|로는|,)?\s*/, "")
+            .replace(/(?:입니다|합니다|것입니다|통해서입니다|방식입니다)[.?!]*$/, "")
+            .trim();
+          if (shortHead.length > 28) {
+            shortHead = shortHead.slice(0, 28).trim();
+          }
+          expandedSubs.push({
+            ...sub,
+            code: "",
+            title: `${numStr}. ${shortHead || `${ordWord} 항목`}`,
+            body: segText,
+            bullets: [segText]
+          });
+        }
+        continue;
+      }
+      expandedSubs.push(sub);
+    }
+    return { ...ch, subs: expandedSubs };
+  });
+}
+
 function renderHanaroChaptersHtml(chapters, ratio = 30, templateName = "기본서식", docTitle = "") {
+  const normalizedChapters = expandMergedNumberedSubsInBrowser(chapters);
   const r = Number(ratio) || 30;
   const tplStr = String(templateName || "");
   const isBullet = tplStr.includes("bullet");
@@ -1988,7 +2065,7 @@ function renderHanaroChaptersHtml(chapters, ratio = 30, templateName = "기본�
     : "요약";
   const headerHtml = `<div class="hanaro-section-head"><span class="hanaro-num-badge">1</span><h2>${escapeHtml(headerTitle)}</h2></div>`;
   const docTitleHtml = docTitle ? `<h1 class="hanaro-doc-title">${escapeHtml(docTitle)}</h1>` : "";
-  const bodyHtml = chapters
+  const bodyHtml = normalizedChapters
     .map((ch) => {
       const totalSubsInCh = Array.isArray(ch.subs) ? ch.subs.length : 0;
       const limit = totalSubsInCh;
