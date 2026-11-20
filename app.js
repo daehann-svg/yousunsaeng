@@ -1045,10 +1045,10 @@ async function summarizeDirectlyViaBrowserGemini(segments, title, channel, ratio
   }
 
   const baseRules = String(tplObj.rules || tplObj.body || "").replace(/굵은\s*글씨\s*없이[^\n]*/g, "");
-  const customRules = extraClean
-    ? `${baseRules}\n\n[사용자 추가 요약·편집 명령어 (최우선 반영)]\n${extraClean}`.trim()
-    : baseRules;
-  const rulesNote = customRules ? `\n\n[사용자 지정 서식 상세 규칙]\n${customRules}` : "";
+    const customRules = extraClean
+      ? `[★★★ 사용자 지정 요약 컨셉 및 특별 요청 (가장 최우선으로 반영할 것) ★★★]\n${extraClean}\n\n[기본 서식 참고 규칙]\n${baseRules}`.trim()
+      : baseRules;
+    const rulesNote = customRules ? `\n\n${customRules}` : "";
   const cleanTitleTheme = extractCoreTitleTheme(title);
   const kpRuleText = `- [2] 핵심(keypoints): 서식 종류와 관계없이 총 ${kpCount}개 항목을 반드시 "**핵심 소제목 (성경적 상징/핵심 원인/핵심 개념)**\\n구체적인 이유와 **핵심 키워드**가 볼드(**) 강조된 2문장 설명"의 2단 구조로 작성하세요.`;
 
@@ -1086,7 +1086,10 @@ ${kpRuleText}`
 ${kpRuleText}`;
 
     const partLabel = totalChunks > 1 ? `\n[구간 안내: 전체 ${totalChunks}개 구간 중 ${chunkIdx + 1}번째 구간 원문]` : "";
-    const userPrompt = `영상 제목: ${title}\n본문 요약의 핵심 주제: ${cleanTitleTheme}\n채널명: ${channel}\n요약률 목표: ${r}% (충분히 상세하고 깊이 있게 작성할 것)${partLabel}\n\n[스크립트 원문]\n${chunkText}`;
+    const extraUserReminder = extraClean
+      ? `\n\n[★★★ 필수 반영 요청사항 (반드시 이 지시에 맞춰 대주제·소제목과 본문을 작성할 것) ★★★]\n${extraClean}`
+      : "";
+    const userPrompt = `영상 제목: ${title}\n본문 요약의 핵심 주제: ${cleanTitleTheme}\n채널명: ${channel}\n요약률 목표: ${r}% (충분히 상세하고 깊이 있게 작성할 것)${partLabel}${extraUserReminder}\n\n[스크립트 원문]\n${chunkText}`;
 
     for (const m of models) {
       try {
@@ -1445,7 +1448,7 @@ async function runSummarizationAlgorithm(segments, title, channel, ratio, templa
     }
 
   const combinedRules = extraClean
-    ? `${baseTemplateRules}\n\n[사용자 지정 요약 컨셉 및 추가 특별 요청 (기존 서식 규칙보다 최우선 반영할 것)]\n${extraClean}`.trim()
+    ? `[★★★ 사용자 지정 요약 컨셉 및 추가 특별 요청 (기존 서식 규칙보다 최우선 반영할 것) ★★★]\n${extraClean}\n\n${baseTemplateRules}`.trim()
     : baseTemplateRules;
 
     const isStaticWebMode = document.body.classList.contains("static-public-mode") && location.port !== "18765";
@@ -7509,12 +7512,22 @@ document.getElementById("apply-ratio-btn")?.addEventListener("click", async () =
       console.warn("Resummarize flush warning (kept in local state):", saveErr);
     }
     const targetTabName = overwriteEdited ? "[요약 원본 + 요약 수정본]" : "[요약 수정본] (원본 보존)";
-    const successMsg = `요약률 ${newRatio}% · 서식[${chosenTplObj.name}] · 컨셉[${chosenConObj.name}]${extraResumCmd ? ` · 특별요청[${extraResumCmd.slice(0, 22)}]` : ""} 결과가 ${targetTabName}에 저장되었습니다 (${new Date().toLocaleTimeString()}).`;
+    const isGitHubPages = location.hostname.endsWith("github.io");
+    const ghSyncLoaded = isGitHubPages && Boolean(getStoredGithubToken());
+    const successMsg = `요약률 ${newRatio}% · 서식[${chosenTplObj.name}] · 컨셉[${chosenConObj.name}]${extraResumCmd ? ` · 특별요청[${extraResumCmd.slice(0, 22)}]` : ""} 결과가 ${targetTabName}${ghSyncLoaded ? " 및 GitHub 클라우드 DB" : ""}에 즉시 반영되었습니다 (${new Date().toLocaleTimeString()}).`;
     showResummarizeResultNotification(true, successMsg);
+    const contentCardEl = document.getElementById("article-content");
+    if (contentCardEl) {
+      contentCardEl.style.transition = "box-shadow 0.35s ease, background-color 0.35s ease";
+      contentCardEl.style.boxShadow = "0 0 0 3px #88a48366";
+      setTimeout(() => {
+        contentCardEl.style.boxShadow = "";
+      }, 1800);
+    }
     setTimeout(() => {
       const modal = document.getElementById("ratio");
       if (modal && modal.open) modal.close();
-    }, 650);
+    }, 550);
   } catch (error) {
     const failMsg = `${error.message || "알 수 없는 오류가 발생했습니다."} (${new Date().toLocaleTimeString()})`;
     showResummarizeResultNotification(false, failMsg);

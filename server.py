@@ -1383,6 +1383,18 @@ def build_sanitized_public_db_bytes() -> bytes:
         "modelApiKeys": dict(sanitized.get("modelApiKeys") or {}) if isinstance(sanitized.get("modelApiKeys"), dict) else {},
         "githubToken": str(LAST_ACCESS_TOKEN or ""),
     }
+    # Preserve existing githubToken inside encryptedAdminVault if LAST_ACCESS_TOKEN is not set in memory
+    if not vault_payload["githubToken"] and sanitized.get("encryptedAdminVault"):
+        try:
+            key_str_existing = f"yousunsaeng-vault-v1:{adm_id}:{adm_hash}"
+            kb = key_str_existing.encode("utf-8")
+            raw_bytes = bytes.fromhex(str(sanitized["encryptedAdminVault"]))
+            dec_bytes = bytes(b ^ (kb[i % len(kb)] ^ ((i * 31 + 17) & 0xFF)) for i, b in enumerate(raw_bytes))
+            existing_vault = json.loads(dec_bytes.decode("utf-8"))
+            if isinstance(existing_vault, dict) and existing_vault.get("githubToken"):
+                vault_payload["githubToken"] = str(existing_vault["githubToken"])
+        except Exception:
+            pass
     if vault_payload["apiKey"] or any(vault_payload["modelApiKeys"].values()) or vault_payload["githubToken"]:
         key_str = f"yousunsaeng-vault-v1:{adm_id}:{adm_hash}"
         sanitized["encryptedAdminVault"] = xor_vault_crypt_hex(
@@ -1569,6 +1581,7 @@ def api_github_check():
 
 @app.route("/api/github/upload", methods=["POST", "OPTIONS"])
 def api_github_upload():
+    global LAST_ACCESS_TOKEN
     if request.method == "OPTIONS":
         return jsonify({"ok": True})
     data = request.get_json(silent=True) or {}
@@ -1579,6 +1592,8 @@ def api_github_upload():
     password = str(data.get("password") or "").strip()
     if LAST_ACCESS_TOKEN and (not password or password.startswith("github_pat_")):
         password = LAST_ACCESS_TOKEN
+    elif password and password.startswith(("gho_", "ghp_", "github_pat_", "ghu_")):
+        LAST_ACCESS_TOKEN = password
     repo_path = str(data.get("repoPath") or "").strip()
     branch = str(data.get("branch") or "main").strip() or "main"
     subpath = str(data.get("subpath") or "").strip().strip("/")
